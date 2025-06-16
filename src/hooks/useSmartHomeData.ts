@@ -237,6 +237,58 @@ export const useSmartHomeData = () => {
     await fetchPlatforms();
   };
 
+  const removeDuplicatePlatforms = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Get all SmartThings platforms for this user
+      const { data: smartThingsPlatforms, error: fetchError } = await supabase
+        .from('smart_home_platforms')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('platform_name', 'SmartThings')
+        .order('created_at', { ascending: false });
+
+      if (fetchError) throw fetchError;
+
+      if (smartThingsPlatforms && smartThingsPlatforms.length > 1) {
+        // Keep the most recent one and remove the rest
+        const platformsToDelete = smartThingsPlatforms.slice(1);
+        
+        for (const platform of platformsToDelete) {
+          const { error: deleteError } = await supabase
+            .from('smart_home_platforms')
+            .delete()
+            .eq('id', platform.id);
+          
+          if (deleteError) {
+            console.error('Error deleting duplicate platform:', deleteError);
+          }
+        }
+
+        await fetchPlatforms();
+        
+        toast({
+          title: "Cleanup Complete",
+          description: `Removed ${platformsToDelete.length} duplicate SmartThings platform(s)`,
+        });
+      } else {
+        toast({
+          title: "No Duplicates Found",
+          description: "No duplicate platforms to remove",
+        });
+      }
+    } catch (error) {
+      console.error('Error removing duplicate platforms:', error);
+      toast({
+        title: "Cleanup Failed",
+        description: "Failed to remove duplicate platforms",
+        variant: "destructive"
+      });
+    }
+  };
+
   const updateDeviceStatus = async (deviceId: string, status: any) => {
     console.log(`Updating device ${deviceId} status:`, status);
     const { error } = await supabase
@@ -378,6 +430,7 @@ export const useSmartHomeData = () => {
     updateDeviceStatus,
     controlDevice,
     logActivity,
-    syncSmartThingsDevices
+    syncSmartThingsDevices,
+    removeDuplicatePlatforms
   };
 };
