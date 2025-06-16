@@ -34,68 +34,77 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 
 // Utility function to determine device type from capabilities
 const getDeviceTypeFromCapabilities = (capabilities: any, deviceType: string, deviceName: string): string => {
-  if (!capabilities || !Array.isArray(capabilities)) return deviceType === 'camera_view' ? 'camera_view' : 'switch';
+  if (!capabilities) return deviceType === 'camera_view' ? 'camera_view' : 'switch';
   
   const name = deviceName.toLowerCase();
 
-  // Check for camera view specifically
-  if (deviceType === 'camera_view' || name.includes('camera view')) {
+  // Check for camera view specifically - including ReoLink cameras
+  if (deviceType === 'camera_view' || name.includes('camera view') || name.includes('camera')) {
     return 'camera_view';
   }
 
-  // Check for Family Hub specifically
-  if (name.includes('family hub') || name.includes('refrigerator')) {
-    return 'family-hub';
+  // Check for ReoLink camera capabilities structure
+  if (capabilities.ptz_commands || capabilities.night_vision_commands) {
+    console.log(`Device ${deviceName} identified as camera_view based on PTZ/night vision capabilities`);
+    return 'camera_view';
   }
 
-  // Check for sensor capabilities first
-  for (const component of capabilities) {
-    if (component && component.capabilities && Array.isArray(component.capabilities)) {
-      const hasCapability = (capName: string) => 
-        component.capabilities.some((cap: any) => 
-          cap && cap.id && cap.id.toLowerCase().includes(capName.toLowerCase())
-        );
+  // If capabilities is an array (SmartThings format)
+  if (Array.isArray(capabilities)) {
+    // Check for Family Hub specifically
+    if (name.includes('family hub') || name.includes('refrigerator')) {
+      return 'family-hub';
+    }
 
-      // Check for presence sensor (Aqara FP2 and similar)
-      if (hasCapability('presenceSensor') || hasCapability('motionSensor') || hasCapability('illuminanceMeasurement')) {
-        console.log(`Device ${deviceName} identified as sensor based on capabilities`);
-        return 'sensor';
-      }
+    // Check for sensor capabilities first
+    for (const component of capabilities) {
+      if (component && component.capabilities && Array.isArray(component.capabilities)) {
+        const hasCapability = (capName: string) => 
+          component.capabilities.some((cap: any) => 
+            cap && cap.id && cap.id.toLowerCase().includes(capName.toLowerCase())
+          );
 
-      // Check for thermostat capabilities
-      if (hasCapability('thermostat') || 
-          hasCapability('temperatureMeasurement') ||
-          hasCapability('thermostatHeatingSetpoint') ||
-          hasCapability('thermostatCoolingSetpoint') ||
-          hasCapability('thermostatMode')) {
-        console.log(`Device ${deviceName} identified as thermostat based on capabilities`);
-        return 'thermostat';
+        // Check for presence sensor (Aqara FP2 and similar)
+        if (hasCapability('presenceSensor') || hasCapability('motionSensor') || hasCapability('illuminanceMeasurement')) {
+          console.log(`Device ${deviceName} identified as sensor based on capabilities`);
+          return 'sensor';
+        }
+
+        // Check for thermostat capabilities
+        if (hasCapability('thermostat') || 
+            hasCapability('temperatureMeasurement') ||
+            hasCapability('thermostatHeatingSetpoint') ||
+            hasCapability('thermostatCoolingSetpoint') ||
+            hasCapability('thermostatMode')) {
+          console.log(`Device ${deviceName} identified as thermostat based on capabilities`);
+          return 'thermostat';
+        }
       }
     }
+
+    // Fallback to original logic for other device types
+    const hasCapability = (capName: string) => 
+      capabilities.some((comp: any) => 
+        comp && typeof comp === 'object' && 
+        Object.keys(comp).some(key => key.toLowerCase().includes(capName.toLowerCase()))
+      );
+
+    // Check for ceiling fan lights specifically - they should be treated as dimmers
+    if (name.includes('ceiling fan light') || name.includes('fan light')) {
+      return 'dimmer';
+    }
+
+    // Check for fan speed capability first, but exclude lights
+    if ((hasCapability('fanSpeed') || hasCapability('speed')) && !name.includes('light')) return 'fan';
+    if (hasCapability('switchLevel') || hasCapability('level')) return 'dimmer';
+    if (hasCapability('lock')) return 'lock';
+    if (hasCapability('camera') || hasCapability('videoCamera')) return 'camera_view';
+    
+    // Name-based detection for fans (excluding lights)
+    if (name.includes('fan') && !name.includes('light')) return 'fan';
+    if (name.includes('tv') || name.includes('television')) return 'tv';
+    if (name.includes('thermostat')) return 'thermostat';
   }
-
-  // Fallback to original logic for other device types
-  const hasCapability = (capName: string) => 
-    capabilities.some((comp: any) => 
-      comp && typeof comp === 'object' && 
-      Object.keys(comp).some(key => key.toLowerCase().includes(capName.toLowerCase()))
-    );
-
-  // Check for ceiling fan lights specifically - they should be treated as dimmers
-  if (name.includes('ceiling fan light') || name.includes('fan light')) {
-    return 'dimmer';
-  }
-
-  // Check for fan speed capability first, but exclude lights
-  if ((hasCapability('fanSpeed') || hasCapability('speed')) && !name.includes('light')) return 'fan';
-  if (hasCapability('switchLevel') || hasCapability('level')) return 'dimmer';
-  if (hasCapability('lock')) return 'lock';
-  if (hasCapability('camera') || hasCapability('videoCamera')) return 'camera';
-  
-  // Name-based detection for fans (excluding lights)
-  if (name.includes('fan') && !name.includes('light')) return 'fan';
-  if (name.includes('tv') || name.includes('television')) return 'tv';
-  if (name.includes('thermostat')) return 'thermostat';
   
   return 'switch';
 };
