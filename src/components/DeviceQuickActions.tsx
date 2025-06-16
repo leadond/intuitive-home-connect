@@ -631,7 +631,7 @@ export const DeviceQuickActions = () => {
     return roomMappings[roomId] || `Room ${roomId.slice(0, 8)}`;
   };
 
-  // Enhanced handler function for toggling devices with better error handling
+  // Enhanced handler function for toggling devices with immediate status refresh
   const handleToggleDevice = async (device: SmartHomeDevice) => {
     try {
       console.log(`Attempting to toggle device: ${device.device_name} (${device.device_id})`);
@@ -669,8 +669,16 @@ export const DeviceQuickActions = () => {
         description: `${device.device_name} turned ${newState}`,
       });
       
-      // Refresh status after a short delay
-      setTimeout(() => refreshLiveStatuses(), 1000);
+      // Immediate status refresh for this specific device
+      setTimeout(async () => {
+        const updatedStatus = await fetchLiveDeviceStatus(device.device_id);
+        if (updatedStatus) {
+          setLiveStatuses(prev => ({
+            ...prev,
+            [device.device_id]: updatedStatus
+          }));
+        }
+      }, 500);
     } catch (error) {
       console.error('Error toggling device:', error);
       toast({
@@ -681,7 +689,7 @@ export const DeviceQuickActions = () => {
     }
   };
 
-  // Handler function for dimmer changes
+  // Handler function for dimmer changes with immediate refresh
   const handleDimmerChange = async (device: SmartHomeDevice, value: number[]) => {
     try {
       const level = value[0];
@@ -695,8 +703,16 @@ export const DeviceQuickActions = () => {
         description: `${device.device_name} set to ${level}%`,
       });
       
-      // Refresh status after a short delay
-      setTimeout(() => refreshLiveStatuses(), 1000);
+      // Immediate status refresh for this specific device
+      setTimeout(async () => {
+        const updatedStatus = await fetchLiveDeviceStatus(device.device_id);
+        if (updatedStatus) {
+          setLiveStatuses(prev => ({
+            ...prev,
+            [device.device_id]: updatedStatus
+          }));
+        }
+      }, 500);
     } catch (error) {
       console.error('Error changing dimmer level:', error);
       toast({
@@ -707,7 +723,7 @@ export const DeviceQuickActions = () => {
     }
   };
 
-  // Handler function for fan speed changes
+  // Handler function for fan speed changes with immediate refresh
   const handleFanSpeedChange = async (device: SmartHomeDevice, value: number[]) => {
     try {
       const speed = value[0];
@@ -719,8 +735,16 @@ export const DeviceQuickActions = () => {
         description: `${device.device_name} set to speed ${speed}`,
       });
       
-      // Refresh status after a short delay
-      setTimeout(() => refreshLiveStatuses(), 1000);
+      // Immediate status refresh for this specific device
+      setTimeout(async () => {
+        const updatedStatus = await fetchLiveDeviceStatus(device.device_id);
+        if (updatedStatus) {
+          setLiveStatuses(prev => ({
+            ...prev,
+            [device.device_id]: updatedStatus
+          }));
+        }
+      }, 500);
     } catch (error) {
       console.error('Error changing fan speed:', error);
     }
@@ -811,11 +835,14 @@ export const DeviceQuickActions = () => {
     setRefreshing(false);
   };
 
-  // Refresh live statuses on component mount and periodically
+  // More frequent refresh intervals for real-time updates
   useEffect(() => {
     if (devices.length > 0) {
+      // Initial load
       refreshLiveStatuses();
-      const interval = setInterval(refreshLiveStatuses, 30000); // Every 30 seconds
+      
+      // More frequent refresh interval - every 10 seconds instead of 30
+      const interval = setInterval(refreshLiveStatuses, 10000);
       return () => clearInterval(interval);
     }
   }, [devices]);
