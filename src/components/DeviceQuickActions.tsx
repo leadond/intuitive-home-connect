@@ -382,6 +382,11 @@ export const DeviceQuickActions = () => {
     }
   };
 
+  // Handler function for opening thermostat dialog
+  const handleThermostatClick = (device: SmartHomeDevice) => {
+    setSelectedThermostat(device);
+  };
+
   const refreshLiveStatuses = async () => {
     setRefreshing(true);
     const newStatuses: Record<string, any> = {};
