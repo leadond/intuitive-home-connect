@@ -92,7 +92,7 @@ export const DeviceQuickActions = () => {
     }
   };
 
-  const getStatusText = (status: any, type: string) => {
+  const getStatusText = (status: any, type: string): string => {
     if (!status) return "unknown";
     
     const deviceType = type.toLowerCase();
@@ -104,21 +104,34 @@ export const DeviceQuickActions = () => {
         if (status.level && status.switch === 'on') {
           return `${status.level}%`;
         }
-        return status.switch || status.state || "off";
+        const switchState = typeof status.switch === 'string' ? status.switch : 
+                           typeof status.state === 'string' ? status.state : 
+                           (status.switch === true || status.state === true) ? 'on' : 'off';
+        return switchState;
       case 'lock':
-        return status.lock === 'locked' || status.locked ? "locked" : "unlocked";
+        const lockState = status.lock === 'locked' || status.locked ? "locked" : "unlocked";
+        return lockState;
       case 'camera':
         return status.recording ? "recording" : "idle";
       case 'thermostat':
-        return status.temperature ? `${status.temperature}°` : (status.mode || "auto");
+        if (status.temperature) {
+          return `${status.temperature}°`;
+        }
+        const thermostatMode = typeof status.mode === 'string' ? status.mode : 'auto';
+        return thermostatMode;
       case 'speaker':
       case 'audio':
         if (status.volume !== undefined) {
           return `Vol: ${status.volume}%`;
         }
-        return status.switch || "off";
+        const audioState = typeof status.switch === 'string' ? status.switch : 
+                          (status.switch === true) ? 'on' : 'off';
+        return audioState;
       default:
-        return status.switch || status.state || "off";
+        const defaultState = typeof status.switch === 'string' ? status.switch : 
+                            typeof status.state === 'string' ? status.state : 
+                            (status.switch === true || status.state === true) ? 'on' : 'off';
+        return defaultState;
     }
   };
 
