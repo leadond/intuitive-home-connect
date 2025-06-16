@@ -22,6 +22,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { DashboardStats } from "@/components/DashboardStats";
 import { DeviceQuickActions } from "@/components/DeviceQuickActions";
 import { RecentActivity } from "@/components/RecentActivity";
+import { SmartThingsSync } from "@/components/SmartThingsSync";
 import { useSmartHomeData } from "@/hooks/useSmartHomeData";
 
 const Index = () => {
@@ -108,6 +109,11 @@ const Index = () => {
           <div className="lg:col-span-1">
             <RecentActivity />
           </div>
+        </div>
+
+        {/* SmartThings Sync Section */}
+        <div className="mb-8">
+          <SmartThingsSync />
         </div>
 
         {/* Platform Status */}
