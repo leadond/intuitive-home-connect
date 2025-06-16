@@ -77,14 +77,72 @@ serve(async (req) => {
 
     // Store or update devices in our database
     for (const device of devices) {
+      // Fetch device status for more accurate data
+      let deviceStatus = {}
+      try {
+        const statusResponse = await fetch(`${baseUrl}/devices/${device.deviceId}/status`, {
+          headers: {
+            'Authorization': `Bearer ${credentials.api_key}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        if (statusResponse.ok) {
+          const statusData = await statusResponse.json()
+          // Extract main component status
+          if (statusData.components && statusData.components.main) {
+            deviceStatus = statusData.components.main
+          }
+        }
+      } catch (statusError) {
+        console.error(`Error fetching status for device ${device.deviceId}:`, statusError)
+      }
+
+      // Determine device type from capabilities
+      let deviceType = device.type?.toLowerCase() || 'unknown'
+      if (device.components && device.components[0] && device.components[0].capabilities) {
+        const capabilities = device.components[0].capabilities
+        if (capabilities.some((cap: any) => cap.id === 'switch' || cap.id === 'switchLevel')) {
+          deviceType = capabilities.some((cap: any) => cap.id === 'switchLevel') ? 'dimmer' : 'switch'
+        } else if (capabilities.some((cap: any) => cap.id === 'lock')) {
+          deviceType = 'lock'
+        } else if (capabilities.some((cap: any) => cap.id === 'thermostat')) {
+          deviceType = 'thermostat'
+        } else if (capabilities.some((cap: any) => cap.id === 'audioVolume')) {
+          deviceType = 'speaker'
+        }
+      }
+
+      // Get room name from location
+      let roomName = null
+      if (device.roomId) {
+        try {
+          const roomResponse = await fetch(`${baseUrl}/locations/${device.locationId}/rooms/${device.roomId}`, {
+            headers: {
+              'Authorization': `Bearer ${credentials.api_key}`,
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            }
+          })
+          
+          if (roomResponse.ok) {
+            const roomData = await roomResponse.json()
+            roomName = roomData.name
+          }
+        } catch (roomError) {
+          console.error(`Error fetching room for device ${device.deviceId}:`, roomError)
+        }
+      }
+
       const deviceData = {
         user_id: user.id,
         platform_id: platforms.id,
         device_id: device.deviceId,
-        device_name: device.name || device.label || 'Unknown Device',
-        device_type: device.type?.toLowerCase() || 'unknown',
-        room: device.roomId || null,
-        status: device.status || {},
+        device_name: device.name || device.label || `${device.deviceTypeName || 'Device'} ${device.deviceId.slice(-4)}`,
+        device_type: deviceType,
+        room: roomName,
+        status: deviceStatus,
         capabilities: device.components || {},
         last_updated: new Date().toISOString()
       }
