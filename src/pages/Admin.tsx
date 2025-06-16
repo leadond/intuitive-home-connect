@@ -35,7 +35,7 @@ const Admin = () => {
   const availablePlatforms = [
     { name: "Lutron", description: "Lighting control system", authType: "OAuth" },
     { name: "Bond", description: "Ceiling fans and fireplaces", authType: "API Key" },
-    { name: "SmartThings", description: "Samsung smart home hub", authType: "OAuth" },
+    { name: "SmartThings", description: "Samsung smart home hub", authType: "API Key" },
     { name: "Amazon Alexa", description: "Voice assistant and smart devices", authType: "OAuth" },
     { name: "Google Home", description: "Google smart home ecosystem", authType: "OAuth" },
     { name: "Lockly", description: "Smart door locks", authType: "API Key" },
