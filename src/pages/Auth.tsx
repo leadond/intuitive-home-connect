@@ -5,36 +5,49 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Home, Loader2 } from "lucide-react";
+import { Home, Loader2, AlertCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn, signUp, user } = useAuth();
+  const [activeTab, setActiveTab] = useState('signin');
+  const { signIn, signUp, user, loading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user) {
+    if (!loading && user) {
+      console.log('User detected, redirecting to home:', user.email);
       navigate('/');
     }
-  }, [user, navigate]);
+  }, [user, loading, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email || !password) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter both email and password",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsLoading(true);
     
     try {
       const { error } = await signIn(email, password);
       
       if (error) {
+        console.error('Sign in failed:', error);
         toast({
           title: "Sign In Failed",
-          description: error.message,
+          description: error.message || "Invalid email or password",
           variant: "destructive"
         });
       } else {
@@ -42,9 +55,13 @@ const Auth = () => {
           title: "Welcome back!",
           description: "You've been signed in successfully."
         });
-        navigate('/');
+        // Force page refresh to ensure clean state
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 1000);
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Sign in error:', error);
       toast({
         title: "Error",
         description: "An unexpected error occurred",
@@ -57,24 +74,54 @@ const Auth = () => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email || !password) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter both email and password",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (password.length < 6) {
+      toast({
+        title: "Password Too Short",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsLoading(true);
     
     try {
       const { error } = await signUp(email, password);
       
       if (error) {
-        toast({
-          title: "Sign Up Failed",
-          description: error.message,
-          variant: "destructive"
-        });
+        console.error('Sign up failed:', error);
+        if (error.message.includes('already registered')) {
+          toast({
+            title: "Account Exists",
+            description: "This email is already registered. Please sign in instead.",
+            variant: "destructive"
+          });
+          setActiveTab('signin');
+        } else {
+          toast({
+            title: "Sign Up Failed",
+            description: error.message,
+            variant: "destructive"
+          });
+        }
       } else {
         toast({
           title: "Account Created!",
-          description: "Please check your email to verify your account."
+          description: "Please check your email to verify your account, or try signing in directly."
         });
+        setActiveTab('signin');
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Sign up error:', error);
       toast({
         title: "Error",
         description: "An unexpected error occurred",
@@ -84,6 +131,15 @@ const Auth = () => {
       setIsLoading(false);
     }
   };
+
+  // Show loading if auth context is still loading
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-6">
@@ -106,7 +162,14 @@ const Auth = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="signin" className="w-full">
+            <Alert className="mb-4 border-blue-300/30 bg-blue-500/10">
+              <AlertCircle className="h-4 w-4 text-blue-300" />
+              <AlertDescription className="text-blue-200">
+                Test account: demo@example.com / password123
+              </AlertDescription>
+            </Alert>
+
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="signin">Sign In</TabsTrigger>
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -124,6 +187,7 @@ const Auth = () => {
                       className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
                       placeholder="Enter your email"
                       required
+                      disabled={isLoading}
                     />
                   </div>
                   <div>
@@ -136,6 +200,7 @@ const Auth = () => {
                       className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
                       placeholder="Enter your password"
                       required
+                      disabled={isLoading}
                     />
                   </div>
                   <Button 
@@ -161,6 +226,7 @@ const Auth = () => {
                       className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
                       placeholder="Enter your email"
                       required
+                      disabled={isLoading}
                     />
                   </div>
                   <div>
@@ -171,8 +237,10 @@ const Auth = () => {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
-                      placeholder="Create a password"
+                      placeholder="Create a password (min 6 characters)"
                       required
+                      disabled={isLoading}
+                      minLength={6}
                     />
                   </div>
                   <Button 
