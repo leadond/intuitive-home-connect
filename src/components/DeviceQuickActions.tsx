@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -164,7 +163,7 @@ export const DeviceQuickActions = () => {
       }
 
       await updateDeviceStatus(device.id, newStatus);
-      await logActivity(device.id, `Device ${device.device_name} toggled to ${getStatusText(newStatus, device.device_type)}`);
+      await logActivity(device.id, `${device.device_name} toggled to ${getStatusText(newStatus, device.device_type)}`);
       
       toast({
         title: "Device Updated",
@@ -174,7 +173,7 @@ export const DeviceQuickActions = () => {
       console.error('Error toggling device:', error);
       toast({
         title: "Error",
-        description: "Failed to toggle device",
+        description: `Failed to toggle ${device.device_name}`,
         variant: "destructive"
       });
     } finally {
@@ -198,12 +197,12 @@ export const DeviceQuickActions = () => {
       };
       
       await updateDeviceStatus(device.id, newStatus);
-      await logActivity(device.id, `Device ${device.device_name} level set to ${level[0]}%`);
+      await logActivity(device.id, `${device.device_name} brightness set to ${level[0]}%`);
     } catch (error) {
       console.error('Error updating device level:', error);
       toast({
         title: "Error",
-        description: "Failed to update device level",
+        description: `Failed to update ${device.device_name} brightness`,
         variant: "destructive"
       });
     } finally {
@@ -227,12 +226,12 @@ export const DeviceQuickActions = () => {
       };
       
       await updateDeviceStatus(device.id, newStatus);
-      await logActivity(device.id, `Device ${device.device_name} volume set to ${volume[0]}%`);
+      await logActivity(device.id, `${device.device_name} volume set to ${volume[0]}%`);
     } catch (error) {
       console.error('Error updating device volume:', error);
       toast({
         title: "Error",
-        description: "Failed to update device volume",
+        description: `Failed to update ${device.device_name} volume`,
         variant: "destructive"
       });
     } finally {
@@ -483,12 +482,14 @@ export const DeviceQuickActions = () => {
                             <div className={`p-2 rounded-lg bg-white/10 transition-all duration-300 ${isControlling ? 'animate-pulse' : ''}`}>
                               <DeviceIcon className="w-5 h-5 text-blue-400" />
                             </div>
-                            <div>
-                              <p className="font-medium text-sm">{device.device_name}</p>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate" title={device.device_name}>
+                                {device.device_name}
+                              </p>
                               <p className="text-xs text-blue-300">{device.platform_name}</p>
                             </div>
                           </div>
-                          <Badge className={`${statusColor} text-white text-xs px-2 py-1 transition-all duration-300`}>
+                          <Badge className={`${statusColor} text-white text-xs px-2 py-1 transition-all duration-300 shrink-0`}>
                             {statusText}
                           </Badge>
                         </div>

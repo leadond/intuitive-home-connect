@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -135,11 +134,20 @@ serve(async (req) => {
         }
       }
 
+      // Use a more meaningful device name
+      let deviceName = device.name || device.label
+      
+      // If no name is available, create a readable one from device type and last 4 characters of ID
+      if (!deviceName || deviceName.trim() === '') {
+        const deviceTypeName = device.deviceTypeName || device.type || 'Device'
+        deviceName = `${deviceTypeName} (${device.deviceId.slice(-4)})`
+      }
+
       const deviceData = {
         user_id: user.id,
         platform_id: platforms.id,
         device_id: device.deviceId,
-        device_name: device.name || device.label || `${device.deviceTypeName || 'Device'} ${device.deviceId.slice(-4)}`,
+        device_name: deviceName,
         device_type: deviceType,
         room: roomName,
         status: deviceStatus,
