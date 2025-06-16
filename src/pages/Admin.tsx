@@ -1,8 +1,10 @@
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Settings, 
   Home, 
@@ -26,6 +28,8 @@ const Admin = () => {
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
 
   // Available platforms that users can connect to
   const availablePlatforms = [
@@ -82,13 +86,19 @@ const Admin = () => {
   };
 
   const handleConnect = (platformName: string, authType: string) => {
-    if (authType === "OAuth" || authType === "HomeKit") {
+    setSelectedPlatform(platformName);
+    
+    if (authType === "OAuth") {
       toast({
-        title: "OAuth Integration",
-        description: `${platformName} requires OAuth authentication. This would redirect you to ${platformName}'s login page.`,
+        title: "OAuth Configuration",
+        description: `Please enter your ${platformName} OAuth credentials below.`,
+      });
+    } else if (authType === "HomeKit") {
+      toast({
+        title: "HomeKit Configuration",
+        description: `${platformName} requires HomeKit pairing. Please enter your pairing code below.`,
       });
     } else {
-      setSelectedPlatform(platformName);
       toast({
         title: "API Key Required",
         description: `Please enter your ${platformName} API key below.`,
@@ -96,24 +106,67 @@ const Admin = () => {
     }
   };
 
-  const handleApiKeySubmit = async () => {
-    if (!selectedPlatform || !apiKey) {
+  const handleCredentialsSubmit = async () => {
+    if (!selectedPlatform) {
       toast({
         title: "Missing Information",
-        description: "Please select a platform and enter an API key.",
+        description: "Please select a platform.",
         variant: "destructive"
       });
       return;
     }
 
+    const platform = availablePlatforms.find(p => p.name === selectedPlatform);
+    if (!platform) return;
+
+    let credentials: any = {};
+
+    if (platform.authType === "API Key") {
+      if (!apiKey) {
+        toast({
+          title: "Missing API Key",
+          description: "Please enter an API key.",
+          variant: "destructive"
+        });
+        return;
+      }
+      credentials = {
+        api_key: apiKey,
+        base_url: baseUrl || undefined
+      };
+    } else if (platform.authType === "OAuth") {
+      if (!clientId || !clientSecret) {
+        toast({
+          title: "Missing OAuth Credentials",
+          description: "Please enter both Client ID and Client Secret.",
+          variant: "destructive"
+        });
+        return;
+      }
+      credentials = {
+        client_id: clientId,
+        client_secret: clientSecret,
+        base_url: baseUrl || undefined
+      };
+    } else if (platform.authType === "HomeKit") {
+      if (!apiKey) {
+        toast({
+          title: "Missing Pairing Code",
+          description: "Please enter the HomeKit pairing code.",
+          variant: "destructive"
+        });
+        return;
+      }
+      credentials = {
+        pairing_code: apiKey
+      };
+    }
+
     try {
       await addPlatform({
         platform_name: selectedPlatform,
-        platform_type: availablePlatforms.find(p => p.name === selectedPlatform)?.authType || "API Key",
-        credentials: {
-          api_key: apiKey,
-          base_url: baseUrl || undefined
-        },
+        platform_type: platform.authType,
+        credentials,
         is_connected: true
       });
 
@@ -126,6 +179,8 @@ const Admin = () => {
       setSelectedPlatform(null);
       setApiKey("");
       setBaseUrl("");
+      setClientId("");
+      setClientSecret("");
     } catch (error) {
       console.error('Error connecting platform:', error);
       toast({
@@ -142,6 +197,8 @@ const Admin = () => {
       description: `${platformName} has been disconnected successfully.`,
     });
   };
+
+  const selectedPlatformData = selectedPlatform ? availablePlatforms.find(p => p.name === selectedPlatform) : null;
 
   if (isLoading) {
     return (
@@ -256,10 +313,10 @@ const Admin = () => {
           <CardHeader>
             <CardTitle className="flex items-center">
               <Key className="w-5 h-5 mr-2 text-yellow-400" />
-              Manual API Configuration
+              Platform Configuration
             </CardTitle>
             <CardDescription className="text-blue-200">
-              For platforms requiring manual API key setup
+              Configure platform credentials manually
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -267,40 +324,96 @@ const Admin = () => {
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="platform-select" className="text-white">Platform</Label>
-                  <select 
-                    id="platform-select"
-                    className="w-full mt-1 p-2 bg-white/10 border border-white/20 rounded-md text-white"
-                    value={selectedPlatform || ""}
-                    onChange={(e) => setSelectedPlatform(e.target.value)}
-                  >
-                    <option value="">Select a platform</option>
-                    {availablePlatforms.filter(p => p.authType === "API Key").map(p => (
-                      <option key={p.name} value={p.name}>{p.name}</option>
-                    ))}
-                  </select>
+                  <Select value={selectedPlatform || ""} onValueChange={setSelectedPlatform}>
+                    <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                      <SelectValue placeholder="Select a platform" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availablePlatforms.map(p => (
+                        <SelectItem key={p.name} value={p.name}>
+                          {p.name} ({p.authType})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div>
-                  <Label htmlFor="api-key" className="text-white">API Key</Label>
-                  <Input 
-                    id="api-key"
-                    type="password"
-                    placeholder="Enter your API key"
-                    className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="base-url" className="text-white">Base URL (Optional)</Label>
-                  <Input 
-                    id="base-url"
-                    placeholder="https://api.example.com"
-                    className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
-                    value={baseUrl}
-                    onChange={(e) => setBaseUrl(e.target.value)}
-                  />
-                </div>
+
+                {selectedPlatformData?.authType === "API Key" && (
+                  <>
+                    <div>
+                      <Label htmlFor="api-key" className="text-white">API Key</Label>
+                      <Input 
+                        id="api-key"
+                        type="password"
+                        placeholder="Enter your API key"
+                        className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
+                        value={apiKey}
+                        onChange={(e) => setApiKey(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="base-url" className="text-white">Base URL (Optional)</Label>
+                      <Input 
+                        id="base-url"
+                        placeholder="https://api.example.com"
+                        className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
+                        value={baseUrl}
+                        onChange={(e) => setBaseUrl(e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+
+                {selectedPlatformData?.authType === "OAuth" && (
+                  <>
+                    <div>
+                      <Label htmlFor="client-id" className="text-white">Client ID</Label>
+                      <Input 
+                        id="client-id"
+                        placeholder="Enter your OAuth Client ID"
+                        className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
+                        value={clientId}
+                        onChange={(e) => setClientId(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="client-secret" className="text-white">Client Secret</Label>
+                      <Input 
+                        id="client-secret"
+                        type="password"
+                        placeholder="Enter your OAuth Client Secret"
+                        className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
+                        value={clientSecret}
+                        onChange={(e) => setClientSecret(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="oauth-base-url" className="text-white">Base URL (Optional)</Label>
+                      <Input 
+                        id="oauth-base-url"
+                        placeholder="https://api.example.com"
+                        className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
+                        value={baseUrl}
+                        onChange={(e) => setBaseUrl(e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+
+                {selectedPlatformData?.authType === "HomeKit" && (
+                  <div>
+                    <Label htmlFor="pairing-code" className="text-white">HomeKit Pairing Code</Label>
+                    <Input 
+                      id="pairing-code"
+                      placeholder="XXX-XX-XXX"
+                      className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
+              
               <div className="space-y-4">
                 <div className="p-4 bg-white/5 rounded-lg">
                   <h4 className="font-medium text-white mb-2 flex items-center">
@@ -308,13 +421,29 @@ const Admin = () => {
                     Security Notice
                   </h4>
                   <p className="text-sm text-blue-200">
-                    API keys are encrypted and stored securely. They are only used to communicate with your devices and are never shared with third parties.
+                    All credentials are encrypted and stored securely. They are only used to communicate with your devices and are never shared with third parties.
                   </p>
                 </div>
+                
+                {selectedPlatformData && (
+                  <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                    <h4 className="font-medium text-white mb-2 flex items-center">
+                      <AlertCircle className="w-4 h-4 mr-2 text-blue-400" />
+                      {selectedPlatformData.name} Configuration
+                    </h4>
+                    <p className="text-sm text-blue-200 mb-2">
+                      Selected: {selectedPlatformData.description}
+                    </p>
+                    <p className="text-sm text-blue-200">
+                      Authentication: {selectedPlatformData.authType}
+                    </p>
+                  </div>
+                )}
+
                 <Button 
                   className="w-full bg-blue-600 hover:bg-blue-700"
-                  onClick={handleApiKeySubmit}
-                  disabled={!selectedPlatform || !apiKey}
+                  onClick={handleCredentialsSubmit}
+                  disabled={!selectedPlatform}
                 >
                   <Key className="w-4 h-4 mr-2" />
                   Save Configuration
