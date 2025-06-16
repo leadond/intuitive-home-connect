@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,30 +16,25 @@ import {
   Zap,
   Monitor,
   Home,
-  Lamp
+  Lamp,
+  RefreshCw
 } from "lucide-react";
 import { useSmartHomeData } from "@/hooks/useSmartHomeData";
+import { useSmartThingsStatus } from "@/hooks/useSmartThingsStatus";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export const DeviceQuickActions = () => {
-  const { devices, isLoading, updateDeviceStatus, logActivity, fetchDevices } = useSmartHomeData();
+  const { devices, isLoading, updateDeviceStatus, logActivity } = useSmartHomeData();
+  const { fetchLiveDeviceStatus, sendDeviceCommand, isUpdating } = useSmartThingsStatus();
   const { toast } = useToast();
-
-  // Refresh device data every 30 seconds to get current status
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchDevices();
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [fetchDevices]);
+  const [liveStatuses, setLiveStatuses] = useState<Record<string, any>>({});
+  const [refreshing, setRefreshing] = useState(false);
 
   // Function to convert room IDs to readable room names
   const getRoomName = (roomId: string | null) => {
     if (!roomId) return 'Other';
     
-    // SmartThings room ID mappings - from the API response
     const roomMappings: Record<string, string> = {
       'cc18dc80-d9b9-4e02-97dc-0d15db379260': 'Living room',
       '8c0275df-a6e1-45d7-9ff3-f9d5c9d51b52': 'Kitchen',
@@ -54,8 +48,32 @@ export const DeviceQuickActions = () => {
       '9cf1f938-1b69-427a-9466-ca27d2c631c6': "Evan's Room",
     };
     
-    return roomMappings[roomId] || `Room ${roomId.slice(0, 8)}`; // Show first 8 chars of ID if no mapping found
+    return roomMappings[roomId] || `Room ${roomId.slice(0, 8)}`;
   };
+
+  const refreshLiveStatuses = async () => {
+    setRefreshing(true);
+    const newStatuses: Record<string, any> = {};
+    
+    for (const device of devices) {
+      const liveStatus = await fetchLiveDeviceStatus(device.device_id);
+      if (liveStatus) {
+        newStatuses[device.device_id] = liveStatus;
+      }
+    }
+    
+    setLiveStatuses(newStatuses);
+    setRefreshing(false);
+  };
+
+  // Refresh live statuses on component mount and periodically
+  useEffect(() => {
+    if (devices.length > 0) {
+      refreshLiveStatuses();
+      const interval = setInterval(refreshLiveStatuses, 30000); // Every 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [devices]);
 
   const getDeviceTypeFromCapabilities = (capabilities: any[], deviceType: string, deviceName: string) => {
     if (!capabilities || !Array.isArray(capabilities)) return deviceType;
@@ -66,12 +84,10 @@ export const DeviceQuickActions = () => {
     
     const deviceNameLower = deviceName.toLowerCase();
     
-    // Check for dimmer capabilities first
     if (capabilityIds.includes('switchLevel') || capabilityIds.includes('colorControl')) {
       return 'dimmer';
     }
     
-    // Check for specific device types based on capabilities and name
     if (capabilityIds.includes('lock')) return 'lock';
     if (capabilityIds.includes('thermostat') || capabilityIds.includes('temperatureMeasurement')) return 'thermostat';
     if (capabilityIds.includes('videoCamera') || deviceNameLower.includes('camera')) return 'camera';
@@ -102,7 +118,6 @@ export const DeviceQuickActions = () => {
       case 'outlet': return Zap;
       case 'switch': return Power;
       default: 
-        // Enhanced fallback based on device name
         if (deviceNameLower.includes('light') || deviceNameLower.includes('lamp')) {
           return deviceNameLower.includes('lamp') ? Lamp : Lightbulb;
         }
@@ -117,26 +132,26 @@ export const DeviceQuickActions = () => {
   };
 
   const getDeviceStatus = (device: any, type: string) => {
-    console.log(`Getting status for device ${device.device_name}:`, device.status);
+    const liveStatus = liveStatuses[device.device_id];
+    const status = liveStatus?.components?.main || device.status;
     
-    if (!device.status) return { state: 'unknown', level: 0 };
+    console.log(`Getting status for device ${device.device_name}:`, { liveStatus, status });
     
-    // Handle different status formats
-    const status = device.status;
+    if (!status) return { state: 'unknown', level: 0 };
     
     switch (type) {
       case 'dimmer':
         return {
-          state: status.switch?.value || status.state || 'off',
-          level: status.switchLevel?.value || status.level || (status.switch?.value === 'on' ? 100 : 0)
+          state: status.switch?.switch?.value || status.switch?.value || status.state || 'off',
+          level: status.switchLevel?.level?.value || status.switchLevel?.value || status.level || (status.switch?.switch?.value === 'on' ? 100 : 0)
         };
       case 'light':
         return {
-          state: status.switch?.value || status.state || 'off'
+          state: status.switch?.switch?.value || status.switch?.value || status.state || 'off'
         };
       case 'lock':
         return {
-          locked: status.lock?.value === 'locked' || status.locked || false
+          locked: status.lock?.lock?.value === 'locked' || status.lock?.value === 'locked' || status.locked || false
         };
       case 'camera':
         return {
@@ -144,12 +159,12 @@ export const DeviceQuickActions = () => {
         };
       case 'thermostat':
         return {
-          mode: status.thermostatMode?.value || status.mode || 'auto',
-          temperature: status.temperature?.value || status.temperature
+          mode: status.thermostatMode?.thermostatMode?.value || status.thermostatMode?.value || status.mode || 'auto',
+          temperature: status.temperature?.temperature?.value || status.temperature?.value || status.temperature
         };
       default:
         return {
-          state: status.switch?.value || status.state || 'off'
+          state: status.switch?.switch?.value || status.switch?.value || status.state || 'off'
         };
     }
   };
@@ -200,47 +215,50 @@ export const DeviceQuickActions = () => {
       const deviceType = getDeviceTypeFromCapabilities(device.capabilities, device.device_type, device.device_name);
       const currentStatus = getDeviceStatus(device, deviceType);
       
-      let newStatus = { ...device.status };
+      let command = '';
+      let capability = '';
       
       switch (deviceType) {
         case 'dimmer':
-          if (currentStatus.state === 'on') {
-            newStatus = { ...newStatus, switch: { value: 'off' }, switchLevel: { value: 0 } };
-          } else {
-            newStatus = { ...newStatus, switch: { value: 'on' }, switchLevel: { value: currentStatus.level || 100 } };
-          }
-          break;
         case 'light':
-          newStatus = { ...newStatus, switch: { value: currentStatus.state === 'on' ? 'off' : 'on' } };
+          capability = 'switch';
+          command = currentStatus.state === 'on' ? 'off' : 'on';
           break;
         case 'lock':
-          newStatus = { ...newStatus, lock: { value: currentStatus.locked ? 'unlocked' : 'locked' } };
+          capability = 'lock';
+          command = currentStatus.locked ? 'unlock' : 'lock';
           break;
         case 'camera':
-          newStatus = { ...newStatus, recording: !currentStatus.recording };
+          // Camera controls vary by manufacturer
+          capability = 'switch';
+          command = currentStatus.recording ? 'off' : 'on';
           break;
         default:
-          newStatus = { ...newStatus, switch: { value: currentStatus.state === 'on' ? 'off' : 'on' } };
+          capability = 'switch';
+          command = currentStatus.state === 'on' ? 'off' : 'on';
       }
 
-      console.log(`Updating device ${device.device_name} with new status:`, newStatus);
+      await sendDeviceCommand(device.device_id, capability, command);
+      await logActivity(device.id, `Device ${device.device_name} ${command}ed via SmartThings API`);
       
-      await updateDeviceStatus(device.id, newStatus);
-      await logActivity(device.id, `Device ${device.device_name} toggled manually`);
-      
-      const newCurrentStatus = getDeviceStatus({ ...device, status: newStatus }, deviceType);
+      // Refresh the live status after a short delay
+      setTimeout(() => {
+        fetchLiveDeviceStatus(device.device_id).then(liveStatus => {
+          if (liveStatus) {
+            setLiveStatuses(prev => ({
+              ...prev,
+              [device.device_id]: liveStatus
+            }));
+          }
+        });
+      }, 1000);
       
       toast({
-        title: "Device Updated",
-        description: `${device.device_name} has been ${getStatusText(newCurrentStatus, deviceType)}`,
+        title: "Command Sent",
+        description: `${device.device_name} has been ${command}ed`,
       });
     } catch (error) {
       console.error('Error toggling device:', error);
-      toast({
-        title: "Error",
-        description: "Failed to toggle device",
-        variant: "destructive"
-      });
     }
   };
 
@@ -249,14 +267,21 @@ export const DeviceQuickActions = () => {
       const level = value[0];
       console.log(`Setting dimmer ${device.device_name} to ${level}%`);
       
-      let newStatus = { 
-        ...device.status,
-        switchLevel: { value: level },
-        switch: { value: level > 0 ? 'on' : 'off' }
-      };
-
-      await updateDeviceStatus(device.id, newStatus);
-      await logActivity(device.id, `Dimmer ${device.device_name} set to ${level}%`);
+      // Send setLevel command to SmartThings
+      await sendDeviceCommand(device.device_id, 'switchLevel', 'setLevel', [level]);
+      await logActivity(device.id, `Dimmer ${device.device_name} set to ${level}% via SmartThings API`);
+      
+      // Refresh the live status after a short delay
+      setTimeout(() => {
+        fetchLiveDeviceStatus(device.device_id).then(liveStatus => {
+          if (liveStatus) {
+            setLiveStatuses(prev => ({
+              ...prev,
+              [device.device_id]: liveStatus
+            }));
+          }
+        });
+      }, 1000);
       
       toast({
         title: "Dimmer Updated",
@@ -264,11 +289,6 @@ export const DeviceQuickActions = () => {
       });
     } catch (error) {
       console.error('Error updating dimmer:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update dimmer",
-        variant: "destructive"
-      });
     }
   };
 
@@ -312,9 +332,20 @@ export const DeviceQuickActions = () => {
   return (
     <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-white">
       <CardHeader>
-        <CardTitle className="flex items-center">
-          <Wifi className="w-6 h-6 mr-2 text-blue-400" />
-          Device Quick Actions
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center">
+            <Wifi className="w-6 h-6 mr-2 text-blue-400" />
+            Device Quick Actions
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={refreshLiveStatuses}
+            disabled={refreshing}
+            className="text-blue-300 hover:text-white hover:bg-white/10"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </Button>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -343,7 +374,7 @@ export const DeviceQuickActions = () => {
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center space-x-3">
                             <div className="p-3 rounded-lg bg-white/10">
-                              <DeviceIcon className="w-6 h-6 text-blue-400" />
+                              <DeviceIcon className="w-7 h-7 text-blue-400" />
                             </div>
                             <div>
                               <p className="font-medium text-sm">{device.device_name}</p>
@@ -363,6 +394,7 @@ export const DeviceQuickActions = () => {
                               <Switch
                                 checked={deviceStatus.state === 'on'}
                                 onCheckedChange={() => handleToggleDevice(device)}
+                                disabled={isUpdating}
                                 className="data-[state=checked]:bg-blue-600"
                               />
                               <span className="text-sm text-blue-200">Power</span>
@@ -378,6 +410,7 @@ export const DeviceQuickActions = () => {
                                   onValueChange={(value) => handleDimmerChange(device, value)}
                                   max={100}
                                   step={1}
+                                  disabled={isUpdating}
                                   className="w-full"
                                 />
                               </div>
@@ -390,8 +423,9 @@ export const DeviceQuickActions = () => {
                               variant="ghost" 
                               className="text-white hover:bg-white/20"
                               onClick={() => handleToggleDevice(device)}
+                              disabled={isUpdating}
                             >
-                              Toggle
+                              {isUpdating ? 'Updating...' : 'Toggle'}
                             </Button>
                           </div>
                         )}
