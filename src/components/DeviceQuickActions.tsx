@@ -297,12 +297,35 @@ export const DeviceQuickActions = () => {
     return device.device_name;
   };
 
-  // Handler function for toggling devices
+  // Enhanced handler function for toggling devices with better error handling
   const handleToggleDevice = async (device: SmartHomeDevice) => {
     try {
+      console.log(`Attempting to toggle device: ${device.device_name} (${device.device_id})`);
+      
       const liveStatus = liveStatuses[device.device_id];
-      const deviceStatus = getDeviceStatus(device, getDeviceTypeFromCapabilities(device.capabilities, device.device_type, device.device_name), liveStatus);
+      const deviceType = getDeviceTypeFromCapabilities(device.capabilities, device.device_type, device.device_name);
+      const deviceStatus = getDeviceStatus(device, deviceType, liveStatus);
+      
+      console.log(`Current device status:`, deviceStatus);
+      
+      // Check if device has switch capability
+      const hasSwitch = device.capabilities?.some((comp: any) => 
+        comp && typeof comp === 'object' && 
+        (comp.switch || Object.keys(comp).some(key => key.toLowerCase().includes('switch')))
+      );
+      
+      if (!hasSwitch) {
+        console.log(`Device ${device.device_name} does not have switch capability`);
+        toast({
+          title: "Device Not Supported",
+          description: `${device.device_name} cannot be toggled. This device type doesn't support on/off control.`,
+          variant: "destructive"
+        });
+        return;
+      }
+      
       const newState = deviceStatus.state === 'on' ? 'off' : 'on';
+      console.log(`Sending command to set ${device.device_name} to ${newState}`);
       
       await sendDeviceCommand(device.device_id, 'switch', newState);
       await logActivity(device.id, `Turned ${newState}`, { newState });
@@ -316,6 +339,11 @@ export const DeviceQuickActions = () => {
       setTimeout(() => refreshLiveStatuses(), 1000);
     } catch (error) {
       console.error('Error toggling device:', error);
+      toast({
+        title: "Toggle Failed",
+        description: `Failed to toggle ${device.device_name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
     }
   };
 
