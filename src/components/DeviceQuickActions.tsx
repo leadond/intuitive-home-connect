@@ -284,6 +284,19 @@ export const DeviceQuickActions = () => {
     return roomMappings[roomId] || `Room ${roomId.slice(0, 8)}`;
   };
 
+  // Function to get custom device name based on temperature for thermostats
+  const getCustomDeviceName = (device: SmartHomeDevice, deviceStatus: any) => {
+    if (getDeviceTypeFromCapabilities(device.capabilities, device.device_type, device.device_name) === 'thermostat') {
+      const currentTemp = deviceStatus.temperature;
+      if (currentTemp === 74) {
+        return 'Upstairs Thermostat';
+      } else if (currentTemp === 75) {
+        return 'Downstairs Thermostat';
+      }
+    }
+    return device.device_name;
+  };
+
   // Handler function for toggling devices
   const handleToggleDevice = async (device: SmartHomeDevice) => {
     try {
@@ -503,6 +516,7 @@ export const DeviceQuickActions = () => {
                       const DeviceIcon = getDeviceIcon(deviceType, device.device_name);
                       const liveStatus = liveStatuses[device.device_id];
                       const deviceStatus = getDeviceStatus(device, deviceType, liveStatus);
+                      const customDeviceName = getCustomDeviceName(device, deviceStatus);
                       const isDimmer = deviceType === 'dimmer';
                       const isFan = deviceType === 'fan';
                       const isThermostat = deviceType === 'thermostat';
@@ -522,7 +536,7 @@ export const DeviceQuickActions = () => {
                                 <DeviceIcon className="w-8 h-8 text-blue-400" />
                               </div>
                               <div>
-                                <p className="font-medium text-sm">{device.device_name}</p>
+                                <p className="font-medium text-sm">{customDeviceName}</p>
                                 <p className="text-xs text-blue-300">{device.platform_name}</p>
                               </div>
                             </div>
