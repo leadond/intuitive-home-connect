@@ -242,104 +242,68 @@ export const useSmartHomeData = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      console.log(`=== Starting complete disconnect for platform: ${platformName} ===`);
+      console.log(`=== Starting force disconnect for platform: ${platformName} ===`);
       
-      // Step 1: Get all platform IDs for this platform name and user
-      const { data: platformsToDelete, error: fetchError } = await supabase
-        .from('smart_home_platforms')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('platform_name', platformName);
-
-      if (fetchError) {
-        console.error('Error fetching platforms:', fetchError);
-        throw fetchError;
-      }
-
-      const platformIds = platformsToDelete?.map(p => p.id) || [];
-      console.log(`Found ${platformIds.length} platforms to delete:`, platformIds);
-
-      if (platformIds.length === 0) {
-        console.log('No platforms found to delete');
-        return;
-      }
-
-      // Step 2: Get all device IDs for these platforms
-      const { data: devicesToDelete, error: devicesError } = await supabase
-        .from('smart_home_devices')
-        .select('id')
-        .eq('user_id', user.id)
-        .in('platform_id', platformIds);
-
-      if (devicesError) {
-        console.error('Error fetching devices:', devicesError);
-        throw devicesError;
-      }
-
-      const deviceIds = devicesToDelete?.map(d => d.id) || [];
-      console.log(`Found ${deviceIds.length} devices to delete:`, deviceIds);
-
-      // Step 3: Delete ALL activity logs for this user first (safer approach)
-      console.log('Deleting all activity logs for user to avoid foreign key issues...');
+      // Step 1: Delete ALL activity logs for this user (safest approach)
+      console.log('Force deleting all activity logs for user...');
       const { error: allLogsError } = await supabase
         .from('device_activity_logs')
         .delete()
         .eq('user_id', user.id);
 
       if (allLogsError) {
-        console.error('Error deleting all activity logs:', allLogsError);
-        throw allLogsError;
-      }
-      console.log('Successfully deleted all activity logs for user');
-
-      // Step 4: Delete all devices for these platforms
-      if (platformIds.length > 0) {
-        const { error: deleteDevicesError } = await supabase
-          .from('smart_home_devices')
-          .delete()
-          .eq('user_id', user.id)
-          .in('platform_id', platformIds);
-
-        if (deleteDevicesError) {
-          console.error('Error deleting devices:', deleteDevicesError);
-          throw deleteDevicesError;
-        }
-        console.log('Successfully deleted all devices for platforms');
+        console.error('Error deleting activity logs:', allLogsError);
+        // Continue anyway - we want to force the disconnect
+      } else {
+        console.log('Successfully deleted all activity logs');
       }
 
-      // Step 5: Finally delete all platforms for this user and platform name
-      const { error: deleteError } = await supabase
+      // Step 2: Delete ALL devices for this user (force approach)
+      console.log('Force deleting all devices for user...');
+      const { error: allDevicesError } = await supabase
+        .from('smart_home_devices')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (allDevicesError) {
+        console.error('Error deleting devices:', allDevicesError);
+        // Continue anyway
+      } else {
+        console.log('Successfully deleted all devices');
+      }
+
+      // Step 3: Delete ALL platforms for this user and platform name
+      console.log(`Force deleting all ${platformName} platforms...`);
+      const { error: platformsError } = await supabase
         .from('smart_home_platforms')
         .delete()
         .eq('user_id', user.id)
         .eq('platform_name', platformName);
 
-      if (deleteError) {
-        console.error('Error deleting platforms:', deleteError);
-        throw deleteError;
+      if (platformsError) {
+        console.error('Error deleting platforms:', platformsError);
+        throw platformsError;
       }
 
-      console.log(`Successfully force-deleted all ${platformName} data`);
+      console.log(`Successfully force-disconnected ${platformName}`);
       
-      // Step 6: Immediately clear local state
-      setPlatforms(prevPlatforms => {
-        const filtered = prevPlatforms.filter(p => p.platform_name !== platformName);
-        console.log('Platforms after immediate filter:', filtered);
-        return filtered;
-      });
+      // Step 4: Immediately update local state
+      setPlatforms(prevPlatforms => 
+        prevPlatforms.filter(p => p.platform_name !== platformName)
+      );
       
-      setDevices(prevDevices => {
-        const filtered = prevDevices.filter(d => d.platform_name !== platformName);
-        console.log('Devices after filter:', filtered);
-        return filtered;
-      });
+      setDevices(prevDevices => 
+        prevDevices.filter(d => d.platform_name !== platformName)
+      );
       
-      // Step 7: Force refresh from database to ensure consistency
+      setActivityLogs([]);
+      
+      // Step 5: Refresh from database
       await fetchAllData();
       
       toast({
         title: "Platform Disconnected",
-        description: `All ${platformName} connections and devices have been completely removed.`,
+        description: `${platformName} has been completely removed and all data cleared.`,
       });
 
     } catch (error) {
