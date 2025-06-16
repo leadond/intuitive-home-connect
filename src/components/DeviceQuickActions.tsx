@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +20,9 @@ import {
   Pause,
   SkipForward,
   SkipBack,
-  VolumeX
+  VolumeX,
+  Zap,
+  Circle
 } from "lucide-react";
 import { useSmartHomeData } from "@/hooks/useSmartHomeData";
 import { useToast } from "@/hooks/use-toast";
@@ -73,7 +74,7 @@ export const DeviceQuickActions = () => {
   };
 
   const getStatusColor = (status: any, type: string) => {
-    if (!status) return "bg-gray-600";
+    if (!status) return "from-gray-500 to-gray-600";
     
     const deviceType = type.toLowerCase();
     switch (deviceType) {
@@ -81,15 +82,17 @@ export const DeviceQuickActions = () => {
       case 'bulb':
       case 'switch':
       case 'dimmer':
-        return status.switch === 'on' || status.state === 'on' ? "bg-green-500" : "bg-gray-500";
+        return status.switch === 'on' || status.state === 'on' ? "from-amber-400 to-yellow-500" : "from-gray-500 to-gray-600";
       case 'lock':
-        return status.lock === 'locked' || status.locked ? "bg-green-500" : "bg-red-500";
+        return status.lock === 'locked' || status.locked ? "from-green-400 to-emerald-500" : "from-red-400 to-red-500";
       case 'camera':
-        return status.recording ? "bg-green-500" : "bg-gray-500";
+        return status.recording ? "from-red-400 to-red-500" : "from-gray-500 to-gray-600";
       case 'thermostat':
-        return "bg-blue-500";
+        return "from-blue-400 to-blue-500";
+      case 'speaker':
+        return status.switch === 'on' || status.state === 'on' ? "from-purple-400 to-purple-500" : "from-gray-500 to-gray-600";
       default:
-        return status.switch === 'on' || status.state === 'on' ? "bg-green-500" : "bg-gray-500";
+        return status.switch === 'on' || status.state === 'on' ? "from-green-400 to-emerald-500" : "from-gray-500 to-gray-600";
     }
   };
 
@@ -118,7 +121,6 @@ export const DeviceQuickActions = () => {
         if (status.temperature) {
           return `${status.temperature}°`;
         }
-        // Ensure we always return a string for thermostat mode
         let thermostatMode = 'auto';
         if (typeof status.thermostatMode === 'string') {
           thermostatMode = status.thermostatMode;
@@ -160,11 +162,10 @@ export const DeviceQuickActions = () => {
           break;
         case 'lock':
           const currentLock = device.status?.lock || (device.status?.locked ? 'locked' : 'unlocked');
-          const newLockState = currentLock === 'locked' ? 'unlocked' : 'locked';
+          const newLockState = currentLock === 'locked' ? 'unlock' : 'lock';
           await controlDevice(device.id, 'lock', newLockState);
           break;
         case 'camera':
-          // For cameras, we'll still use the local status update since most cameras don't support direct recording control
           let newStatus = { ...device.status };
           newStatus.recording = !device.status?.recording;
           await updateDeviceStatus(device.id, newStatus);
@@ -309,38 +310,45 @@ export const DeviceQuickActions = () => {
     const isControlling = controllingDevices.has(device.id);
     const isOn = device.status?.switch === 'on' || device.status?.state === 'on';
     
-    // Dimmable lights (including dimmers)
+    // Enhanced Dimmable lights with stunning animations
     if (isDimmable(device) && isLight(device)) {
       const currentLevel = device.status?.level || 0;
       return (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-amber-500/20 to-yellow-500/20 backdrop-blur-sm border border-amber-300/30">
             <div className="flex items-center space-x-3">
-              <Switch 
-                checked={isOn}
-                onCheckedChange={() => handleToggleDevice(device)}
-                disabled={isControlling}
-                className={`data-[state=checked]:bg-blue-500 transition-all duration-300 ${isControlling ? 'animate-pulse' : ''}`}
-              />
-              <span className="text-xs text-blue-300 font-medium">
+              <div className="relative">
+                <Switch 
+                  checked={isOn}
+                  onCheckedChange={() => handleToggleDevice(device)}
+                  disabled={isControlling}
+                  className={`data-[state=checked]:bg-amber-500 transition-all duration-500 ${isControlling ? 'animate-pulse' : ''}`}
+                />
+                {isOn && (
+                  <div className="absolute -inset-1 bg-amber-400/50 rounded-full blur-sm animate-pulse"></div>
+                )}
+              </div>
+              <span className={`text-sm font-bold transition-all duration-500 ${
+                isOn ? 'text-amber-300 drop-shadow-lg' : 'text-gray-400'
+              }`}>
                 {isOn ? 'ON' : 'OFF'}
               </span>
             </div>
-            <div className={`text-xs font-semibold px-2 py-1 rounded-md transition-all duration-300 ${
-              isOn ? 'text-yellow-400 bg-yellow-400/20' : 'text-gray-400 bg-gray-400/20'
+            <div className={`text-sm font-bold px-3 py-1 rounded-full transition-all duration-500 backdrop-blur-md ${
+              isOn ? 'text-amber-200 bg-amber-400/30 shadow-lg shadow-amber-400/50' : 'text-gray-400 bg-gray-400/20'
             }`}>
               {currentLevel}%
             </div>
           </div>
           
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-blue-300">Brightness</span>
-              <div className={`w-2 h-2 rounded-full transition-all duration-500 ${
-                isOn && currentLevel > 0 ? 'bg-yellow-400 animate-pulse' : 'bg-gray-500'
+              <span className="text-sm text-amber-300 font-medium">Brightness</span>
+              <div className={`w-3 h-3 rounded-full transition-all duration-700 ${
+                isOn && currentLevel > 0 ? 'bg-amber-400 animate-pulse shadow-lg shadow-amber-400/80' : 'bg-gray-500'
               }`}></div>
             </div>
-            <div className="relative">
+            <div className="relative group">
               <Slider
                 value={[currentLevel]}
                 onValueChange={(value) => handleLevelChange(device, value)}
@@ -350,29 +358,39 @@ export const DeviceQuickActions = () => {
                 className={`w-full transition-all duration-300 ${isControlling ? 'opacity-50' : ''}`}
               />
               <div 
-                className={`absolute top-0 left-0 h-full bg-gradient-to-r from-yellow-200 to-yellow-400 rounded-full transition-all duration-500 pointer-events-none ${
-                  isOn ? 'opacity-30' : 'opacity-0'
+                className={`absolute top-0 left-0 h-full bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 rounded-full transition-all duration-700 pointer-events-none ${
+                  isOn ? 'opacity-40 shadow-lg shadow-amber-400/50' : 'opacity-0'
                 }`}
                 style={{ width: `${currentLevel}%` }}
               ></div>
+              {isOn && currentLevel > 0 && (
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-200/20 to-yellow-200/20 rounded-full animate-pulse pointer-events-none"></div>
+              )}
             </div>
           </div>
         </div>
       );
     }
     
-    // Regular lights/switches
+    // Enhanced Regular lights/switches
     if (isLight(device)) {
       return (
-        <div className="flex items-center justify-between">
-          <Switch 
-            checked={isOn}
-            onCheckedChange={() => handleToggleDevice(device)}
-            disabled={isControlling}
-            className={`data-[state=checked]:bg-blue-500 transition-all duration-300 ${isControlling ? 'animate-pulse' : ''}`}
-          />
-          <span className={`text-xs font-medium transition-all duration-300 ${
-            isOn ? 'text-green-400' : 'text-gray-400'
+        <div className={`flex items-center justify-between p-3 rounded-xl transition-all duration-500 backdrop-blur-sm border ${
+          isOn ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border-amber-300/30 shadow-lg shadow-amber-400/30' : 'bg-gray-500/10 border-gray-400/20'
+        }`}>
+          <div className="relative">
+            <Switch 
+              checked={isOn}
+              onCheckedChange={() => handleToggleDevice(device)}
+              disabled={isControlling}
+              className={`data-[state=checked]:bg-amber-500 transition-all duration-500 ${isControlling ? 'animate-pulse' : ''}`}
+            />
+            {isOn && (
+              <div className="absolute -inset-1 bg-amber-400/50 rounded-full blur-sm animate-pulse"></div>
+            )}
+          </div>
+          <span className={`text-sm font-bold transition-all duration-500 ${
+            isOn ? 'text-amber-300 drop-shadow-lg' : 'text-gray-400'
           }`}>
             {isOn ? 'ON' : 'OFF'}
           </span>
@@ -380,19 +398,26 @@ export const DeviceQuickActions = () => {
       );
     }
     
-    // Locks
+    // Enhanced Locks with security theme
     if (isLock(device)) {
       const isLocked = device.status?.lock === 'locked' || device.status?.locked;
       return (
-        <div className="flex items-center justify-between">
-          <Switch 
-            checked={isLocked}
-            onCheckedChange={() => handleToggleDevice(device)}
-            disabled={isControlling}
-            className={`data-[state=checked]:bg-green-500 transition-all duration-300 ${isControlling ? 'animate-pulse' : ''}`}
-          />
-          <span className={`text-xs font-medium transition-all duration-300 ${
-            isLocked ? 'text-green-400' : 'text-red-400'
+        <div className={`flex items-center justify-between p-3 rounded-xl transition-all duration-500 backdrop-blur-sm border ${
+          isLocked ? 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-green-300/30 shadow-lg shadow-green-400/30' : 'bg-gradient-to-r from-red-500/20 to-rose-500/20 border-red-300/30 shadow-lg shadow-red-400/30'
+        }`}>
+          <div className="relative">
+            <Switch 
+              checked={isLocked}
+              onCheckedChange={() => handleToggleDevice(device)}
+              disabled={isControlling}
+              className={`${isLocked ? 'data-[state=checked]:bg-green-500' : 'data-[state=unchecked]:bg-red-500'} transition-all duration-500 ${isControlling ? 'animate-pulse' : ''}`}
+            />
+            {(isLocked || !isLocked) && (
+              <div className={`absolute -inset-1 ${isLocked ? 'bg-green-400/50' : 'bg-red-400/50'} rounded-full blur-sm animate-pulse`}></div>
+            )}
+          </div>
+          <span className={`text-sm font-bold transition-all duration-500 ${
+            isLocked ? 'text-green-300 drop-shadow-lg' : 'text-red-300 drop-shadow-lg'
           }`}>
             {isLocked ? 'LOCKED' : 'UNLOCKED'}
           </span>
@@ -400,51 +425,54 @@ export const DeviceQuickActions = () => {
       );
     }
     
-    // Speakers
+    // Enhanced Speakers with music theme
     if (isSpeaker(device)) {
       return (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between space-x-2">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-purple-500/20 to-violet-500/20 backdrop-blur-sm border border-purple-300/30">
             <Button 
               size="sm" 
               variant="ghost" 
-              className="text-white hover:bg-white/20 p-2"
+              className="text-white hover:bg-purple-500/30 p-2 rounded-full transition-all duration-300 hover:scale-110"
               onClick={() => handleToggleDevice(device)}
               disabled={isControlling}
             >
-              <Power className="w-3 h-3" />
+              <Power className={`w-4 h-4 ${isControlling ? 'animate-spin' : ''}`} />
             </Button>
-            <div className="flex space-x-1">
-              <Button size="sm" variant="ghost" className="text-white hover:bg-white/20 p-1">
+            <div className="flex space-x-2">
+              <Button size="sm" variant="ghost" className="text-white hover:bg-purple-500/30 p-2 rounded-full transition-all duration-300 hover:scale-110">
                 <SkipBack className="w-3 h-3" />
               </Button>
-              <Button size="sm" variant="ghost" className="text-white hover:bg-white/20 p-1">
+              <Button size="sm" variant="ghost" className="text-white hover:bg-purple-500/30 p-2 rounded-full transition-all duration-300 hover:scale-110">
                 {device.status?.playing ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
               </Button>
-              <Button size="sm" variant="ghost" className="text-white hover:bg-white/20 p-1">
+              <Button size="sm" variant="ghost" className="text-white hover:bg-purple-500/30 p-2 rounded-full transition-all duration-300 hover:scale-110">
                 <SkipForward className="w-3 h-3" />
               </Button>
             </div>
           </div>
           {device.status?.volume !== undefined && (
-            <div className="flex items-center space-x-2">
-              <VolumeX className="w-3 h-3 text-blue-300" />
-              <Slider
-                value={[device.status?.volume || 0]}
-                onValueChange={(value) => handleVolumeChange(device, value)}
-                max={100}
-                step={1}
-                disabled={isControlling}
-                className="flex-1"
-              />
-              <Volume2 className="w-3 h-3 text-blue-300" />
+            <div className="flex items-center space-x-3 p-2 rounded-lg bg-purple-500/10">
+              <VolumeX className="w-4 h-4 text-purple-300" />
+              <div className="flex-1 relative">
+                <Slider
+                  value={[device.status?.volume || 0]}
+                  onValueChange={(value) => handleVolumeChange(device, value)}
+                  max={100}
+                  step={1}
+                  disabled={isControlling}
+                  className="flex-1"
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-300/20 to-violet-300/20 rounded-full animate-pulse pointer-events-none"></div>
+              </div>
+              <Volume2 className="w-4 h-4 text-purple-300" />
             </div>
           )}
         </div>
       );
     }
     
-    // Thermostats
+    // Enhanced Thermostats with climate theme
     if (isThermostat(device)) {
       let thermostatModeValue = 'auto';
       if (typeof device.status?.thermostatMode === 'string') {
@@ -454,65 +482,78 @@ export const DeviceQuickActions = () => {
       }
         
       return (
-        <div className="space-y-2">
+        <div className="space-y-3 p-3 rounded-xl bg-gradient-to-r from-blue-500/20 to-cyan-500/20 backdrop-blur-sm border border-blue-300/30">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-blue-300">Target:</span>
-            <div className="flex items-center space-x-1">
-              <Button size="sm" variant="ghost" className="text-white hover:bg-white/20 p-1">
+            <span className="text-sm text-blue-300 font-medium">Target Temperature</span>
+            <div className="flex items-center space-x-2">
+              <Button size="sm" variant="ghost" className="text-white hover:bg-blue-500/30 p-1 rounded-full transition-all duration-300 hover:scale-110">
                 <Minus className="w-3 h-3" />
               </Button>
-              <span className="text-xs text-white min-w-[3rem] text-center">
+              <span className="text-sm text-white min-w-[3rem] text-center font-bold bg-blue-400/30 px-3 py-1 rounded-full">
                 {device.status?.thermostatSetpoint || device.status?.temperature || '--'}°
               </span>
-              <Button size="sm" variant="ghost" className="text-white hover:bg-white/20 p-1">
+              <Button size="sm" variant="ghost" className="text-white hover:bg-blue-500/30 p-1 rounded-full transition-all duration-300 hover:scale-110">
                 <Plus className="w-3 h-3" />
               </Button>
             </div>
           </div>
-          <div className="text-xs text-blue-300 text-center">
+          <div className="text-xs text-blue-300 text-center font-medium bg-blue-400/20 py-1 rounded-lg">
             Mode: {thermostatModeValue}
           </div>
         </div>
       );
     }
     
-    // Cameras
+    // Enhanced Cameras with surveillance theme
     if (isCamera(device)) {
       const isRecording = device.status?.recording;
       return (
-        <div className="flex items-center justify-between">
-          <Switch 
-            checked={isRecording}
-            onCheckedChange={() => handleToggleDevice(device)}
-            disabled={isControlling}
-            className={`data-[state=checked]:bg-red-500 transition-all duration-300 ${isControlling ? 'animate-pulse' : ''}`}
-          />
-          <span className={`text-xs font-medium transition-all duration-300 ${
-            isRecording ? 'text-red-400' : 'text-gray-400'
+        <div className={`flex items-center justify-between p-3 rounded-xl transition-all duration-500 backdrop-blur-sm border ${
+          isRecording ? 'bg-gradient-to-r from-red-500/20 to-rose-500/20 border-red-300/30 shadow-lg shadow-red-400/30' : 'bg-gray-500/10 border-gray-400/20'
+        }`}>
+          <div className="relative">
+            <Switch 
+              checked={isRecording}
+              onCheckedChange={() => handleToggleDevice(device)}
+              disabled={isControlling}
+              className={`data-[state=checked]:bg-red-500 transition-all duration-500 ${isControlling ? 'animate-pulse' : ''}`}
+            />
+            {isRecording && (
+              <div className="absolute -inset-1 bg-red-400/50 rounded-full blur-sm animate-pulse"></div>
+            )}
+          </div>
+          <span className={`text-sm font-bold transition-all duration-500 flex items-center gap-2 ${
+            isRecording ? 'text-red-300 drop-shadow-lg' : 'text-gray-400'
           }`}>
+            {isRecording && <Circle className="w-2 h-2 fill-current animate-pulse" />}
             {isRecording ? 'RECORDING' : 'IDLE'}
           </span>
         </div>
       );
     }
     
-    // Default control for other devices
+    // Enhanced Default control with energy theme
     return (
       <Button 
         size="sm" 
         variant="ghost" 
-        className="text-white hover:bg-white/20 p-2 transition-all duration-200 hover:scale-105"
+        className="text-white hover:bg-gradient-to-r hover:from-blue-500/30 hover:to-cyan-500/30 p-3 rounded-xl transition-all duration-500 hover:scale-105 hover:shadow-lg hover:shadow-blue-400/30 border border-blue-300/20"
         onClick={() => handleToggleDevice(device)}
         disabled={isControlling}
       >
-        <Power className={`w-4 h-4 transition-all duration-300 ${isControlling ? 'animate-spin' : ''}`} />
+        <div className="relative">
+          <Power className={`w-5 h-5 transition-all duration-300 ${isControlling ? 'animate-spin' : ''}`} />
+          {isControlling && (
+            <div className="absolute -inset-1 bg-blue-400/50 rounded-full blur-sm animate-pulse"></div>
+          )}
+        </div>
       </Button>
     );
   };
 
   if (isLoading) {
     return (
-      <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-white">
+      <Card className="bg-white/5 backdrop-blur-xl border-white/20 text-white shadow-2xl">
         <CardHeader>
           <CardTitle className="flex items-center">
             <Wifi className="w-5 h-5 mr-2 text-blue-400" />
@@ -520,13 +561,17 @@ export const DeviceQuickActions = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="animate-pulse space-y-4">
+          <div className="animate-pulse space-y-6">
             {Array.from({ length: 3 }).map((_, index) => (
               <div key={index}>
-                <div className="h-6 bg-white/10 rounded mb-2 animate-fade-in"></div>
-                <div className="space-y-2">
+                <div className="h-6 bg-gradient-to-r from-blue-400/20 to-cyan-400/20 rounded-lg mb-4 animate-shimmer"></div>
+                <div className="space-y-3">
                   {Array.from({ length: 2 }).map((_, deviceIndex) => (
-                    <div key={deviceIndex} className="h-20 bg-white/10 rounded animate-fade-in" style={{ animationDelay: `${deviceIndex * 100}ms` }}></div>
+                    <div 
+                      key={deviceIndex} 
+                      className="h-24 bg-gradient-to-r from-white/5 to-white/10 rounded-xl animate-shimmer border border-white/10" 
+                      style={{ animationDelay: `${deviceIndex * 150}ms` }}
+                    ></div>
                   ))}
                 </div>
               </div>
@@ -538,38 +583,49 @@ export const DeviceQuickActions = () => {
   }
 
   return (
-    <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-white">
-      <CardHeader>
+    <Card className="bg-white/5 backdrop-blur-xl border-white/20 text-white shadow-2xl overflow-hidden">
+      <CardHeader className="bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border-b border-white/10">
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center">
-            <Wifi className="w-5 h-5 mr-2 text-blue-400" />
-            Device Control
+            <div className="relative">
+              <Wifi className="w-6 h-6 mr-3 text-blue-400" />
+              <div className="absolute -inset-1 bg-blue-400/30 rounded-full blur-sm animate-pulse"></div>
+            </div>
+            <div>
+              <span className="text-xl font-bold bg-gradient-to-r from-blue-300 to-cyan-300 bg-clip-text text-transparent">
+                Device Control
+              </span>
+              <div className="text-xs text-blue-200 mt-1">Smart Home Command Center</div>
+            </div>
           </div>
           {hasSmartThings && (
             <Button 
               size="sm"
               onClick={handleSyncDevices}
               disabled={syncing}
-              className="bg-blue-600 hover:bg-blue-700 transition-all duration-200 hover:scale-105"
+              className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-blue-400/30"
             >
-              <RefreshCw className={`w-3 h-3 mr-1 transition-transform duration-500 ${syncing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 mr-2 transition-transform duration-500 ${syncing ? 'animate-spin' : ''}`} />
               {syncing ? 'Syncing...' : 'Sync'}
             </Button>
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
+      <CardContent className="p-6">
+        <div className="space-y-8">
           {Object.keys(devicesByRoom).length === 0 ? (
-            <div className="text-center py-8 animate-fade-in">
-              <p className="text-blue-300 mb-4">No devices found.</p>
+            <div className="text-center py-12 animate-fade-in">
+              <div className="mb-6">
+                <Zap className="w-16 h-16 mx-auto text-blue-400 opacity-50" />
+              </div>
+              <p className="text-blue-300 mb-6 text-lg">No devices found.</p>
               {hasSmartThings ? (
                 <Button 
                   onClick={handleSyncDevices}
                   disabled={syncing}
-                  className="bg-blue-600 hover:bg-blue-700 transition-all duration-200 hover:scale-105"
+                  className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-blue-400/30"
                 >
-                  <RefreshCw className={`w-4 h-4 mr-2 transition-transform duration-500 ${syncing ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`w-5 h-5 mr-2 transition-transform duration-500 ${syncing ? 'animate-spin' : ''}`} />
                   {syncing ? 'Syncing Devices...' : 'Sync SmartThings Devices'}
                 </Button>
               ) : (
@@ -579,39 +635,55 @@ export const DeviceQuickActions = () => {
           ) : (
             Object.entries(devicesByRoom).map(([room, roomDevices]) => (
               <div key={room} className="animate-fade-in">
-                <h3 className="text-lg font-semibold text-blue-200 mb-3">{room}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="flex items-center mb-6">
+                  <h3 className="text-xl font-bold bg-gradient-to-r from-blue-300 to-cyan-300 bg-clip-text text-transparent">
+                    {room}
+                  </h3>
+                  <div className="flex-1 h-px bg-gradient-to-r from-blue-400/50 to-transparent ml-4"></div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {roomDevices.map((device, index) => {
                     const DeviceIcon = getDeviceIcon(device.device_type, device.capabilities);
                     const statusText = getStatusText(device.status, device.device_type);
-                    const statusColor = getStatusColor(device.status, device.device_type);
+                    const statusGradient = getStatusColor(device.status, device.device_type);
                     const isControlling = controllingDevices.has(device.id);
                     
                     return (
                       <div 
                         key={device.id}
-                        className="flex flex-col p-4 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-300 border border-white/10 hover:border-white/20 hover:scale-[1.02] animate-fade-in"
+                        className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md border border-white/20 hover:border-white/40 transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl hover:shadow-blue-500/20 animate-fade-in"
                         style={{ animationDelay: `${index * 100}ms` }}
                       >
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-3">
-                            <div className={`p-2 rounded-lg bg-white/10 transition-all duration-300 ${isControlling ? 'animate-pulse' : ''}`}>
-                              <DeviceIcon className="w-5 h-5 text-blue-400" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm truncate" title={device.device_name}>
-                                {device.device_name}
-                              </p>
-                              <p className="text-xs text-blue-300">{device.platform_name}</p>
-                            </div>
-                          </div>
-                          <Badge className={`${statusColor} text-white text-xs px-2 py-1 transition-all duration-300 shrink-0`}>
-                            {statusText}
-                          </Badge>
-                        </div>
+                        {/* Animated background gradient */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                         
-                        <div className="mt-auto">
-                          {renderDeviceControls(device)}
+                        {/* Status indicator line */}
+                        <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${statusGradient} transition-all duration-500`}></div>
+                        
+                        <div className="relative p-6">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center space-x-4">
+                              <div className={`relative p-3 rounded-xl bg-gradient-to-br ${statusGradient}/20 backdrop-blur-sm transition-all duration-500 ${isControlling ? 'animate-pulse' : 'group-hover:scale-110'}`}>
+                                <DeviceIcon className="w-6 h-6 text-white drop-shadow-lg" />
+                                {isControlling && (
+                                  <div className="absolute -inset-1 bg-blue-400/50 rounded-xl blur-sm animate-pulse"></div>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-white text-lg truncate group-hover:text-blue-200 transition-colors duration-300" title={device.device_name}>
+                                  {device.device_name}
+                                </p>
+                                <p className="text-sm text-blue-300/80">{device.platform_name}</p>
+                              </div>
+                            </div>
+                            <Badge className={`bg-gradient-to-r ${statusGradient} text-white text-xs px-3 py-1 font-bold shadow-lg transition-all duration-500 shrink-0 border-0`}>
+                              {statusText}
+                            </Badge>
+                          </div>
+                          
+                          <div className="mt-6">
+                            {renderDeviceControls(device)}
+                          </div>
                         </div>
                       </div>
                     );
