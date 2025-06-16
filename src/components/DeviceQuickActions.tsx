@@ -29,13 +29,34 @@ import { ThermostatControlDialog } from "@/components/ThermostatControlDialog";
 const getDeviceTypeFromCapabilities = (capabilities: any, deviceType: string, deviceName: string): string => {
   if (!capabilities || !Array.isArray(capabilities)) return 'switch';
   
+  const name = deviceName.toLowerCase();
+
+  // Check for thermostat capabilities first - look for thermostat-specific capabilities
+  for (const component of capabilities) {
+    if (component && component.capabilities && Array.isArray(component.capabilities)) {
+      const hasCapability = (capName: string) => 
+        component.capabilities.some((cap: any) => 
+          cap && cap.id && cap.id.toLowerCase().includes(capName.toLowerCase())
+        );
+
+      // Check for thermostat capabilities
+      if (hasCapability('thermostat') || 
+          hasCapability('temperatureMeasurement') ||
+          hasCapability('thermostatHeatingSetpoint') ||
+          hasCapability('thermostatCoolingSetpoint') ||
+          hasCapability('thermostatMode')) {
+        console.log(`Device ${deviceName} identified as thermostat based on capabilities`);
+        return 'thermostat';
+      }
+    }
+  }
+
+  // Fallback to original logic for other device types
   const hasCapability = (capName: string) => 
     capabilities.some((comp: any) => 
       comp && typeof comp === 'object' && 
       Object.keys(comp).some(key => key.toLowerCase().includes(capName.toLowerCase()))
     );
-
-  const name = deviceName.toLowerCase();
 
   // Check for ceiling fan lights specifically - they should be treated as dimmers
   if (name.includes('ceiling fan light') || name.includes('fan light')) {
@@ -45,13 +66,13 @@ const getDeviceTypeFromCapabilities = (capabilities: any, deviceType: string, de
   // Check for fan speed capability first, but exclude lights
   if ((hasCapability('fanSpeed') || hasCapability('speed')) && !name.includes('light')) return 'fan';
   if (hasCapability('switchLevel') || hasCapability('level')) return 'dimmer';
-  if (hasCapability('thermostat')) return 'thermostat';
   if (hasCapability('lock')) return 'lock';
   if (hasCapability('camera') || hasCapability('videoCamera')) return 'camera';
   
   // Name-based detection for fans (excluding lights)
   if (name.includes('fan') && !name.includes('light')) return 'fan';
   if (name.includes('tv') || name.includes('television')) return 'tv';
+  if (name.includes('thermostat')) return 'thermostat';
   
   return 'switch';
 };
