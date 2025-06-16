@@ -129,14 +129,22 @@ export const useSmartHomeData = () => {
     setEnergyData(data || []);
   };
 
-  const addPlatform = async (platformData: Omit<SmartHomePlatform, 'id'>) => {
+  const addPlatform = async (platformData: { 
+    platform_name: string; 
+    platform_type: string; 
+    credentials: any;
+    is_connected?: boolean;
+  }) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
     const { error } = await supabase
       .from('smart_home_platforms')
       .insert({
-        ...platformData,
+        platform_name: platformData.platform_name,
+        platform_type: platformData.platform_type,
+        credentials: platformData.credentials,
+        is_connected: platformData.is_connected || false,
         user_id: user.id
       });
 
