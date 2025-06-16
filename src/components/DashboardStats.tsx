@@ -1,5 +1,4 @@
 
-
 import { Card, CardContent } from "@/components/ui/card";
 import { 
   Lightbulb, 
@@ -28,77 +27,17 @@ export const DashboardStats = () => {
     );
   }
 
-  // Enhanced device filtering to handle SmartThings device types
-  const lightDevices = devices.filter(d => 
-    ['light', 'bulb', 'switch'].includes(d.device_type.toLowerCase()) ||
-    d.device_name.toLowerCase().includes('light') ||
-    d.device_name.toLowerCase().includes('bulb')
-  );
-  
-  const climateDevices = devices.filter(d => 
-    ['thermostat', 'temperature'].includes(d.device_type.toLowerCase()) ||
-    d.device_name.toLowerCase().includes('thermostat')
-  );
-  
-  const securityDevices = devices.filter(d => 
-    ['security', 'sensor', 'motion'].includes(d.device_type.toLowerCase()) ||
-    d.device_name.toLowerCase().includes('sensor')
-  );
-  
-  const cameraDevices = devices.filter(d => 
-    d.device_type.toLowerCase().includes('camera') ||
-    d.device_name.toLowerCase().includes('camera')
-  );
-  
-  const lockDevices = devices.filter(d => 
-    d.device_type.toLowerCase().includes('lock') ||
-    d.device_name.toLowerCase().includes('lock')
-  );
+  const lightDevices = devices.filter(d => d.device_type === 'light');
+  const climateDevices = devices.filter(d => d.device_type === 'thermostat');
+  const securityDevices = devices.filter(d => d.device_type === 'security');
+  const cameraDevices = devices.filter(d => d.device_type === 'camera');
+  const lockDevices = devices.filter(d => d.device_type === 'lock');
 
-  // Calculate active states
-  const lightsOn = lightDevices.filter(d => 
-    d.status?.switch === 'on' || 
-    d.status?.state === 'on'
-  ).length;
-
+  const lightsOn = lightDevices.filter(d => d.status?.state === 'on').length;
   const currentTemp = climateDevices[0]?.status?.temperature || 'N/A';
-  
-  const securityArmed = securityDevices.some(d => 
-    d.status?.armed || 
-    d.status?.contact === 'closed'
-  );
-  
-  const camerasRecording = cameraDevices.filter(d => 
-    d.status?.recording
-  ).length;
-  
-  const locksSecured = lockDevices.filter(d => 
-    d.status?.lock === 'locked' || 
-    d.status?.locked
-  ).length;
-
-  // Helper function to safely extract thermostat mode as string
-  const getThermostatModeString = (status: any): string => {
-    if (!status) return 'auto';
-    
-    // Handle if thermostatMode is a string
-    if (typeof status.thermostatMode === 'string') {
-      return status.thermostatMode;
-    }
-    
-    // Handle if mode is a string
-    if (typeof status.mode === 'string') {
-      return status.mode;
-    }
-    
-    // Handle if thermostatMode is an object with a thermostatMode property
-    if (status.thermostatMode && typeof status.thermostatMode === 'object' && status.thermostatMode.thermostatMode) {
-      return String(status.thermostatMode.thermostatMode);
-    }
-    
-    // Default fallback
-    return 'auto';
-  };
+  const securityArmed = securityDevices.some(d => d.status?.armed);
+  const camerasRecording = cameraDevices.filter(d => d.status?.recording).length;
+  const locksSecured = lockDevices.filter(d => d.status?.locked).length;
 
   const stats = [
     {
@@ -112,7 +51,7 @@ export const DashboardStats = () => {
     {
       title: "Climate Control",
       value: typeof currentTemp === 'number' ? `${currentTemp}°F` : currentTemp,
-      subtitle: getThermostatModeString(climateDevices[0]?.status) || `${climateDevices.length} devices`,
+      subtitle: climateDevices[0]?.status?.mode || "No devices",
       icon: Thermometer,
       color: "text-blue-400",
       bgColor: "bg-blue-400/20"
@@ -142,9 +81,9 @@ export const DashboardStats = () => {
       bgColor: "bg-red-400/20"
     },
     {
-      title: "Total Devices",
-      value: devices.length.toString(),
-      subtitle: "Connected devices",
+      title: "Energy Usage",
+      value: "2.4kW",
+      subtitle: "Current usage",
       icon: Zap,
       color: "text-orange-400",
       bgColor: "bg-orange-400/20"
@@ -172,4 +111,3 @@ export const DashboardStats = () => {
     </div>
   );
 };
-

@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,8 +14,7 @@ import {
   Key, 
   Shield,
   Wifi,
-  AlertCircle,
-  RefreshCw
+  AlertCircle
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
@@ -24,13 +24,12 @@ import { ClearPlatformData } from "@/components/ClearPlatformData";
 
 const Admin = () => {
   const { toast } = useToast();
-  const { platforms, addPlatform, syncSmartThingsDevices, isLoading } = useSmartHomeData();
+  const { platforms, addPlatform, isLoading } = useSmartHomeData();
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
-  const [syncing, setSyncing] = useState(false);
 
   // Available platforms that users can connect to
   const availablePlatforms = [
@@ -199,17 +198,6 @@ const Admin = () => {
     });
   };
 
-  const handleSyncSmartThings = async () => {
-    setSyncing(true);
-    try {
-      await syncSmartThingsDevices();
-    } catch (error) {
-      // Error is already handled in the hook
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   const selectedPlatformData = selectedPlatform ? availablePlatforms.find(p => p.name === selectedPlatform) : null;
 
   if (isLoading) {
@@ -238,19 +226,9 @@ const Admin = () => {
               <h1 className="text-xl font-bold text-white">Admin Portal</h1>
             </div>
           </div>
-          <div className="flex items-center space-x-4">
-            <Button 
-              onClick={handleSyncSmartThings}
-              disabled={syncing || !platforms.some(p => p.platform_name === 'SmartThings' && p.is_connected)}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Syncing...' : 'Sync SmartThings'}
-            </Button>
-            <Badge className="bg-blue-600 hover:bg-blue-600">
-              {platformsWithStatus.filter(p => p.status === "connected").length} / {platformsWithStatus.length} Connected
-            </Badge>
-          </div>
+          <Badge className="bg-blue-600 hover:bg-blue-600">
+            {platformsWithStatus.filter(p => p.status === "connected").length} / {platformsWithStatus.length} Connected
+          </Badge>
         </div>
       </header>
 

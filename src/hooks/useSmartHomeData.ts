@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -18,7 +19,6 @@ export interface SmartHomeDevice {
   status: any;
   capabilities: any;
   platform_name: string;
-  external_device_id?: string;
 }
 
 export interface ActivityLog {
@@ -165,67 +165,6 @@ export const useSmartHomeData = () => {
     await fetchDevices();
   };
 
-  const controlDevice = async (deviceId: string, command: string, value: any) => {
-    try {
-      console.log(`Controlling device ${deviceId} with command ${command}:`, value);
-      
-      // Find the device to get external_device_id
-      const device = devices.find(d => d.id === deviceId);
-      if (!device) {
-        throw new Error('Device not found');
-      }
-
-      // Use external_device_id if available, fallback to internal id
-      const externalDeviceId = device.external_device_id || deviceId;
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Not authenticated');
-      }
-
-      const response = await supabase.functions.invoke('control-smartthings-device', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: {
-          deviceId: externalDeviceId,
-          command,
-          value
-        }
-      });
-
-      if (response.error) {
-        console.error('Control device error:', response.error);
-        throw new Error(response.error.message || 'Failed to control device');
-      }
-
-      console.log('Device control response:', response.data);
-      
-      // Update local status optimistically
-      const newStatus = { ...device.status };
-      if (command === 'switch') {
-        newStatus.switch = value;
-      } else if (command === 'switchLevel') {
-        newStatus.level = value;
-        if (value > 0) newStatus.switch = 'on';
-      } else if (command === 'lock') {
-        newStatus.lock = value;
-      }
-      
-      await updateDeviceStatus(deviceId, newStatus);
-      
-      return response.data;
-    } catch (error) {
-      console.error('Error controlling device:', error);
-      toast({
-        title: "Control Failed",
-        description: error.message || "Failed to control device",
-        variant: "destructive"
-      });
-      throw error;
-    }
-  };
-
   const logActivity = async (deviceId: string, action: string, details?: any) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
@@ -243,43 +182,6 @@ export const useSmartHomeData = () => {
     await fetchActivityLogs();
   };
 
-  const syncSmartThingsDevices = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Not authenticated');
-      }
-
-      const response = await supabase.functions.invoke('fetch-smartthings-devices', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (response.error) {
-        throw new Error(response.error.message || 'Failed to sync SmartThings devices');
-      }
-
-      // Refresh devices after sync
-      await fetchDevices();
-      
-      toast({
-        title: "Sync Complete",
-        description: response.data?.message || "SmartThings devices synced successfully",
-      });
-
-      return response.data;
-    } catch (error) {
-      console.error('Error syncing SmartThings devices:', error);
-      toast({
-        title: "Sync Failed",
-        description: error.message || "Failed to sync SmartThings devices",
-        variant: "destructive"
-      });
-      throw error;
-    }
-  };
-
   return {
     platforms,
     devices,
@@ -289,8 +191,6 @@ export const useSmartHomeData = () => {
     fetchAllData,
     addPlatform,
     updateDeviceStatus,
-    controlDevice,
-    logActivity,
-    syncSmartThingsDevices
+    logActivity
   };
 };
