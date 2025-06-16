@@ -218,6 +218,7 @@ export const useSmartHomeData = () => {
     energyData,
     isLoading,
     fetchAllData,
+    fetchDevices,
     addPlatform,
     removePlatform,
     updateDeviceStatus,
