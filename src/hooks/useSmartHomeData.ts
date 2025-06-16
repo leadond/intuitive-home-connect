@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -152,6 +151,70 @@ export const useSmartHomeData = () => {
     await fetchPlatforms();
   };
 
+  const removePlatform = async (platformId: string) => {
+    try {
+      console.log(`Starting removal of platform ${platformId}...`);
+      
+      // Get devices for this platform
+      const { data: devices, error: devicesError } = await supabase
+        .from('smart_home_devices')
+        .select('id')
+        .eq('platform_id', platformId);
+
+      if (devicesError) throw devicesError;
+
+      if (devices && devices.length > 0) {
+        const deviceIds = devices.map(device => device.id);
+
+        // Delete activity logs first
+        const { error: logsError } = await supabase
+          .from('device_activity_logs')
+          .delete()
+          .in('device_id', deviceIds);
+
+        if (logsError) throw logsError;
+        console.log('Activity logs removed');
+
+        // Delete energy usage data
+        const { error: energyError } = await supabase
+          .from('energy_usage')
+          .delete()
+          .in('device_id', deviceIds);
+
+        if (energyError) throw energyError;
+        console.log('Energy usage data removed');
+
+        // Delete devices
+        const { error: deleteDevicesError } = await supabase
+          .from('smart_home_devices')
+          .delete()
+          .eq('platform_id', platformId);
+
+        if (deleteDevicesError) throw deleteDevicesError;
+        console.log('Devices removed');
+      }
+
+      // Finally delete the platform
+      const { error: deletePlatformError } = await supabase
+        .from('smart_home_platforms')
+        .delete()
+        .eq('id', platformId);
+
+      if (deletePlatformError) throw deletePlatformError;
+      console.log('Platform removed');
+
+      await fetchAllData();
+      
+      toast({
+        title: "Platform Removed",
+        description: "Platform and all associated data removed successfully.",
+      });
+    } catch (error) {
+      console.error('Error removing platform:', error);
+      throw error;
+    }
+  };
+
   const updateDeviceStatus = async (deviceId: string, status: any) => {
     const { error } = await supabase
       .from('smart_home_devices')
@@ -190,6 +253,7 @@ export const useSmartHomeData = () => {
     isLoading,
     fetchAllData,
     addPlatform,
+    removePlatform,
     updateDeviceStatus,
     logActivity
   };
