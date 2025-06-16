@@ -841,8 +841,8 @@ export const DeviceQuickActions = () => {
       // Initial load
       refreshLiveStatuses();
       
-      // More frequent refresh interval - every 10 seconds instead of 30
-      const interval = setInterval(refreshLiveStatuses, 10000);
+      // Set refresh interval back to 30 seconds
+      const interval = setInterval(refreshLiveStatuses, 30000);
       return () => clearInterval(interval);
     }
   }, [devices]);
