@@ -104,6 +104,19 @@ const getDeviceIcon = (deviceType: string, deviceName: string) => {
   return Power;
 };
 
+// Function to get custom device name based on temperature for thermostats
+const getCustomDeviceName = (device: SmartHomeDevice, deviceStatus: any) => {
+  if (getDeviceTypeFromCapabilities(device.capabilities, device.device_type, device.device_name) === 'thermostat') {
+    const currentTemp = deviceStatus.temperature;
+    if (currentTemp === 74) {
+      return 'Upstairs Thermostat';
+    } else if (currentTemp === 75) {
+      return 'Downstairs Thermostat';
+    }
+  }
+  return device.device_name;
+};
+
 // Updated function to extract device status from both stored and live data
 const getDeviceStatus = (device: SmartHomeDevice, deviceType: string, liveStatus?: any) => {
   let state = 'unknown';
@@ -539,19 +552,6 @@ export const DeviceQuickActions = () => {
     };
     
     return roomMappings[roomId] || `Room ${roomId.slice(0, 8)}`;
-  };
-
-  // Function to get custom device name based on temperature for thermostats
-  const getCustomDeviceName = (device: SmartHomeDevice, deviceStatus: any) => {
-    if (getDeviceTypeFromCapabilities(device.capabilities, device.device_type, device.device_name) === 'thermostat') {
-      const currentTemp = deviceStatus.temperature;
-      if (currentTemp === 74) {
-        return 'Upstairs Thermostat';
-      } else if (currentTemp === 75) {
-        return 'Downstairs Thermostat';
-      }
-    }
-    return device.device_name;
   };
 
   // Enhanced handler function for toggling devices with better error handling
