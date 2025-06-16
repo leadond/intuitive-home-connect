@@ -242,75 +242,68 @@ export const useSmartHomeData = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      console.log(`=== Starting force disconnect for platform: ${platformName} ===`);
+      console.log(`=== Starting nuclear disconnect for platform: ${platformName} ===`);
       
-      // Step 1: Delete ALL activity logs for this user (safest approach)
-      console.log('Force deleting all activity logs for user...');
+      // Step 1: Delete ALL activity logs for this user (nuclear approach)
+      console.log('NUCLEAR: Deleting ALL activity logs for user...');
       const { error: allLogsError } = await supabase
         .from('device_activity_logs')
         .delete()
         .eq('user_id', user.id);
 
       if (allLogsError) {
-        console.error('Error deleting activity logs:', allLogsError);
-        // Continue anyway - we want to force the disconnect
+        console.error('Error deleting all activity logs:', allLogsError);
       } else {
-        console.log('Successfully deleted all activity logs');
+        console.log('SUCCESS: Deleted all activity logs');
       }
 
-      // Step 2: Delete ALL devices for this user (force approach)
-      console.log('Force deleting all devices for user...');
+      // Step 2: Delete ALL devices for this user (nuclear approach)
+      console.log('NUCLEAR: Deleting ALL devices for user...');
       const { error: allDevicesError } = await supabase
         .from('smart_home_devices')
         .delete()
         .eq('user_id', user.id);
 
       if (allDevicesError) {
-        console.error('Error deleting devices:', allDevicesError);
-        // Continue anyway
+        console.error('Error deleting all devices:', allDevicesError);
       } else {
-        console.log('Successfully deleted all devices');
+        console.log('SUCCESS: Deleted all devices');
       }
 
-      // Step 3: Delete ALL platforms for this user and platform name
-      console.log(`Force deleting all ${platformName} platforms...`);
-      const { error: platformsError } = await supabase
+      // Step 3: Delete ALL platforms for this user (nuclear approach)
+      console.log('NUCLEAR: Deleting ALL platforms for user...');
+      const { error: allPlatformsError } = await supabase
         .from('smart_home_platforms')
         .delete()
-        .eq('user_id', user.id)
-        .eq('platform_name', platformName);
+        .eq('user_id', user.id);
 
-      if (platformsError) {
-        console.error('Error deleting platforms:', platformsError);
-        throw platformsError;
+      if (allPlatformsError) {
+        console.error('Error deleting all platforms:', allPlatformsError);
+        throw allPlatformsError;
+      } else {
+        console.log('SUCCESS: Deleted all platforms');
       }
 
-      console.log(`Successfully force-disconnected ${platformName}`);
+      console.log(`=== NUCLEAR DISCONNECT COMPLETE ===`);
       
-      // Step 4: Immediately update local state
-      setPlatforms(prevPlatforms => 
-        prevPlatforms.filter(p => p.platform_name !== platformName)
-      );
-      
-      setDevices(prevDevices => 
-        prevDevices.filter(d => d.platform_name !== platformName)
-      );
-      
+      // Step 4: Clear all local state immediately
+      setPlatforms([]);
+      setDevices([]);
       setActivityLogs([]);
       
-      // Step 5: Refresh from database
+      // Step 5: Refresh from database to confirm everything is clean
       await fetchAllData();
       
       toast({
-        title: "Platform Disconnected",
-        description: `${platformName} has been completely removed and all data cleared.`,
+        title: "Complete Reset",
+        description: `All smart home data has been completely removed. You can start fresh now.`,
       });
 
     } catch (error) {
-      console.error('Error in disconnectPlatform:', error);
+      console.error('Error in nuclear disconnect:', error);
       toast({
-        title: "Disconnect Failed",
-        description: `Failed to disconnect ${platformName}: ${error.message}`,
+        title: "Reset Failed",
+        description: `Failed to reset data: ${error.message}`,
         variant: "destructive"
       });
       throw error;
