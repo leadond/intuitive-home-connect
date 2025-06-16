@@ -23,6 +23,7 @@ import { DashboardStats } from "@/components/DashboardStats";
 import { DeviceQuickActions } from "@/components/DeviceQuickActions";
 import { RecentActivity } from "@/components/RecentActivity";
 import { SmartThingsSync } from "@/components/SmartThingsSync";
+import { DeleteAromatherapyDevice } from "@/components/DeleteArromatherapyDevice";
 import { useSmartHomeData } from "@/hooks/useSmartHomeData";
 
 const Index = () => {
@@ -50,6 +51,9 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+      {/* Delete aromatherapy device component - runs once on load */}
+      <DeleteAromatherapyDevice />
+      
       {/* Header */}
       <header className="border-b border-white/10 bg-white/5 backdrop-blur-sm">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
