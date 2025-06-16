@@ -331,6 +331,7 @@ export const DeviceQuickActions = () => {
   // Handler function for thermostat mode changes
   const handleThermostatModeChange = async (device: SmartHomeDevice, mode: string) => {
     try {
+      console.log(`Setting thermostat mode for ${device.device_name} to ${mode}`);
       await sendDeviceCommand(device.device_id, 'thermostatMode', 'setThermostatMode', [mode]);
       await logActivity(device.id, `Set thermostat mode to ${mode}`, { mode });
       
@@ -343,6 +344,11 @@ export const DeviceQuickActions = () => {
       setTimeout(() => refreshLiveStatuses(), 1000);
     } catch (error) {
       console.error('Error changing thermostat mode:', error);
+      toast({
+        title: "Error",
+        description: `Failed to change thermostat mode: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
     }
   };
 
@@ -353,6 +359,7 @@ export const DeviceQuickActions = () => {
       const capability = setpointType === 'heating' ? 'thermostatHeatingSetpoint' : 'thermostatCoolingSetpoint';
       const command = setpointType === 'heating' ? 'setHeatingSetpoint' : 'setCoolingSetpoint';
       
+      console.log(`Setting ${setpointType} setpoint for ${device.device_name} to ${temperature}°F`);
       await sendDeviceCommand(device.device_id, capability, command, [temperature]);
       await logActivity(device.id, `Set ${setpointType} setpoint to ${temperature}°F`, { setpointType, temperature });
       
@@ -365,6 +372,11 @@ export const DeviceQuickActions = () => {
       setTimeout(() => refreshLiveStatuses(), 1000);
     } catch (error) {
       console.error(`Error changing ${setpointType} setpoint:`, error);
+      toast({
+        title: "Error",
+        description: `Failed to change ${setpointType} setpoint: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
     }
   };
 
@@ -468,7 +480,7 @@ export const DeviceQuickActions = () => {
                     const currentLevel = deviceStatus.level || 0;
                     const currentFanSpeed = deviceStatus.fanSpeed || 0;
                     
-                    console.log(`Rendering device ${device.device_name}:`, { deviceType, deviceStatus, currentLevel, currentFanSpeed, liveStatus });
+                    console.log(`Rendering device ${device.device_name}:`, { deviceType, deviceStatus, isThermostat });
                     
                     return (
                       <div 
@@ -496,26 +508,35 @@ export const DeviceQuickActions = () => {
                           <div className="space-y-4">
                             {/* Current Temperature Display */}
                             {deviceStatus.temperature !== null && (
-                              <div className="text-center p-3 rounded-lg bg-white/5">
-                                <p className="text-2xl font-bold text-white">{deviceStatus.temperature}°F</p>
-                                <p className="text-sm text-blue-200">Current Temperature</p>
+                              <div className="text-center p-4 rounded-lg bg-white/5 border border-white/10">
+                                <p className="text-3xl font-bold text-white">{Math.round(deviceStatus.temperature)}°F</p>
+                                <p className="text-sm text-blue-200 mt-1">Current Temperature</p>
                               </div>
                             )}
                             
                             {/* Thermostat Mode Selection */}
-                            <div className="space-y-2">
-                              <span className="text-sm text-blue-200">Mode</span>
-                              <div className="grid grid-cols-4 gap-2">
-                                {['off', 'heat', 'cool', 'auto'].map((mode) => (
+                            <div className="space-y-3">
+                              <p className="text-sm font-medium text-blue-200">Thermostat Mode</p>
+                              <div className="grid grid-cols-2 gap-2">
+                                {[
+                                  { mode: 'off', label: 'Off', color: 'bg-gray-600 hover:bg-gray-700' },
+                                  { mode: 'heat', label: 'Heat', color: 'bg-orange-600 hover:bg-orange-700' },
+                                  { mode: 'cool', label: 'Cool', color: 'bg-blue-600 hover:bg-blue-700' },
+                                  { mode: 'auto', label: 'Auto', color: 'bg-green-600 hover:bg-green-700' }
+                                ].map(({ mode, label, color }) => (
                                   <Button
                                     key={mode}
                                     size="sm"
-                                    variant={deviceStatus.thermostatMode === mode ? "default" : "ghost"}
-                                    className={`text-xs ${deviceStatus.thermostatMode === mode ? 'bg-blue-600 hover:bg-blue-700' : 'text-white hover:bg-white/20'}`}
+                                    variant={deviceStatus.thermostatMode === mode ? "default" : "outline"}
+                                    className={`${
+                                      deviceStatus.thermostatMode === mode 
+                                        ? `${color} text-white border-0` 
+                                        : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
+                                    } transition-all duration-200`}
                                     onClick={() => handleThermostatModeChange(device, mode)}
                                     disabled={isUpdating}
                                   >
-                                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                                    {label}
                                   </Button>
                                 ))}
                               </div>
@@ -523,10 +544,10 @@ export const DeviceQuickActions = () => {
                             
                             {/* Heating Setpoint */}
                             {(deviceStatus.thermostatMode === 'heat' || deviceStatus.thermostatMode === 'auto') && (
-                              <div className="space-y-2">
+                              <div className="space-y-3">
                                 <div className="flex items-center justify-between">
-                                  <span className="text-sm text-blue-200">Heat to</span>
-                                  <span className="text-sm text-white">{deviceStatus.heatingSetpoint || 70}°F</span>
+                                  <p className="text-sm font-medium text-blue-200">Heat to</p>
+                                  <p className="text-lg font-bold text-orange-300">{deviceStatus.heatingSetpoint || 70}°F</p>
                                 </div>
                                 <Slider
                                   value={[deviceStatus.heatingSetpoint || 70]}
@@ -537,15 +558,19 @@ export const DeviceQuickActions = () => {
                                   disabled={isUpdating}
                                   className="w-full"
                                 />
+                                <div className="flex justify-between text-xs text-blue-300">
+                                  <span>50°F</span>
+                                  <span>85°F</span>
+                                </div>
                               </div>
                             )}
                             
                             {/* Cooling Setpoint */}
                             {(deviceStatus.thermostatMode === 'cool' || deviceStatus.thermostatMode === 'auto') && (
-                              <div className="space-y-2">
+                              <div className="space-y-3">
                                 <div className="flex items-center justify-between">
-                                  <span className="text-sm text-blue-200">Cool to</span>
-                                  <span className="text-sm text-white">{deviceStatus.coolingSetpoint || 75}°F</span>
+                                  <p className="text-sm font-medium text-blue-200">Cool to</p>
+                                  <p className="text-lg font-bold text-blue-300">{deviceStatus.coolingSetpoint || 75}°F</p>
                                 </div>
                                 <Slider
                                   value={[deviceStatus.coolingSetpoint || 75]}
@@ -556,6 +581,10 @@ export const DeviceQuickActions = () => {
                                   disabled={isUpdating}
                                   className="w-full"
                                 />
+                                <div className="flex justify-between text-xs text-blue-300">
+                                  <span>50°F</span>
+                                  <span>85°F</span>
+                                </div>
                               </div>
                             )}
                           </div>
