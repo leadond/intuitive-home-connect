@@ -15,14 +15,26 @@ import {
   Wifi,
   Power,
   Zap,
-  Monitor
+  Monitor,
+  Home,
+  Lamp
 } from "lucide-react";
 import { useSmartHomeData } from "@/hooks/useSmartHomeData";
 import { useToast } from "@/hooks/use-toast";
+import { useEffect } from "react";
 
 export const DeviceQuickActions = () => {
-  const { devices, isLoading, updateDeviceStatus, logActivity } = useSmartHomeData();
+  const { devices, isLoading, updateDeviceStatus, logActivity, fetchDevices } = useSmartHomeData();
   const { toast } = useToast();
+
+  // Refresh device data every 30 seconds to get current status
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchDevices();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchDevices]);
 
   // Function to convert room IDs to readable room names
   const getRoomName = (roomId: string | null) => {
@@ -54,7 +66,7 @@ export const DeviceQuickActions = () => {
     
     const deviceNameLower = deviceName.toLowerCase();
     
-    // Check for dimmer capabilities
+    // Check for dimmer capabilities first
     if (capabilityIds.includes('switchLevel') || capabilityIds.includes('colorControl')) {
       return 'dimmer';
     }
@@ -77,8 +89,10 @@ export const DeviceQuickActions = () => {
     const deviceNameLower = deviceName.toLowerCase();
     
     switch (type) {
-      case 'dimmer': return Lightbulb;
-      case 'light': return Lightbulb;
+      case 'dimmer': 
+        return deviceNameLower.includes('lamp') ? Lamp : Lightbulb;
+      case 'light': 
+        return deviceNameLower.includes('lamp') ? Lamp : Lightbulb;
       case 'fan': return Fan;
       case 'thermostat': return Thermometer;
       case 'camera': return Camera;
@@ -88,14 +102,55 @@ export const DeviceQuickActions = () => {
       case 'outlet': return Zap;
       case 'switch': return Power;
       default: 
-        // Fallback based on device name
-        if (deviceNameLower.includes('light') || deviceNameLower.includes('lamp')) return Lightbulb;
+        // Enhanced fallback based on device name
+        if (deviceNameLower.includes('light') || deviceNameLower.includes('lamp')) {
+          return deviceNameLower.includes('lamp') ? Lamp : Lightbulb;
+        }
         if (deviceNameLower.includes('fan')) return Fan;
         if (deviceNameLower.includes('tv') || deviceNameLower.includes('monitor')) return Monitor;
         if (deviceNameLower.includes('camera')) return Camera;
         if (deviceNameLower.includes('lock')) return Lock;
         if (deviceNameLower.includes('speaker')) return Volume2;
-        return Wifi;
+        if (deviceNameLower.includes('thermostat')) return Thermometer;
+        return Home;
+    }
+  };
+
+  const getDeviceStatus = (device: any, type: string) => {
+    console.log(`Getting status for device ${device.device_name}:`, device.status);
+    
+    if (!device.status) return { state: 'unknown', level: 0 };
+    
+    // Handle different status formats
+    const status = device.status;
+    
+    switch (type) {
+      case 'dimmer':
+        return {
+          state: status.switch?.value || status.state || 'off',
+          level: status.switchLevel?.value || status.level || (status.switch?.value === 'on' ? 100 : 0)
+        };
+      case 'light':
+        return {
+          state: status.switch?.value || status.state || 'off'
+        };
+      case 'lock':
+        return {
+          locked: status.lock?.value === 'locked' || status.locked || false
+        };
+      case 'camera':
+        return {
+          recording: status.recording || false
+        };
+      case 'thermostat':
+        return {
+          mode: status.thermostatMode?.value || status.mode || 'auto',
+          temperature: status.temperature?.value || status.temperature
+        };
+      default:
+        return {
+          state: status.switch?.value || status.state || 'off'
+        };
     }
   };
 
@@ -123,7 +178,7 @@ export const DeviceQuickActions = () => {
     switch (type) {
       case 'dimmer':
         if (status.state === 'off') return 'off';
-        const level = status.level || status.switchLevel || 100;
+        const level = status.level || 100;
         return `${level}%`;
       case 'light':
         return status.state || "off";
@@ -140,40 +195,47 @@ export const DeviceQuickActions = () => {
 
   const handleToggleDevice = async (device: any) => {
     try {
-      let newStatus = { ...device.status };
+      console.log(`Toggling device ${device.device_name}:`, device);
+      
       const deviceType = getDeviceTypeFromCapabilities(device.capabilities, device.device_type, device.device_name);
+      const currentStatus = getDeviceStatus(device, deviceType);
+      
+      let newStatus = { ...device.status };
       
       switch (deviceType) {
         case 'dimmer':
-          if (device.status?.state === 'on') {
-            newStatus.state = 'off';
-            newStatus.level = 0;
+          if (currentStatus.state === 'on') {
+            newStatus = { ...newStatus, switch: { value: 'off' }, switchLevel: { value: 0 } };
           } else {
-            newStatus.state = 'on';
-            newStatus.level = device.status?.level || 100;
+            newStatus = { ...newStatus, switch: { value: 'on' }, switchLevel: { value: currentStatus.level || 100 } };
           }
           break;
         case 'light':
-          newStatus.state = device.status?.state === 'on' ? 'off' : 'on';
+          newStatus = { ...newStatus, switch: { value: currentStatus.state === 'on' ? 'off' : 'on' } };
           break;
         case 'lock':
-          newStatus.locked = !device.status?.locked;
+          newStatus = { ...newStatus, lock: { value: currentStatus.locked ? 'unlocked' : 'locked' } };
           break;
         case 'camera':
-          newStatus.recording = !device.status?.recording;
+          newStatus = { ...newStatus, recording: !currentStatus.recording };
           break;
         default:
-          newStatus.state = device.status?.state === 'on' ? 'off' : 'on';
+          newStatus = { ...newStatus, switch: { value: currentStatus.state === 'on' ? 'off' : 'on' } };
       }
 
+      console.log(`Updating device ${device.device_name} with new status:`, newStatus);
+      
       await updateDeviceStatus(device.id, newStatus);
       await logActivity(device.id, `Device ${device.device_name} toggled manually`);
       
+      const newCurrentStatus = getDeviceStatus({ ...device, status: newStatus }, deviceType);
+      
       toast({
         title: "Device Updated",
-        description: `${device.device_name} has been ${getStatusText(newStatus, deviceType)}`,
+        description: `${device.device_name} has been ${getStatusText(newCurrentStatus, deviceType)}`,
       });
     } catch (error) {
+      console.error('Error toggling device:', error);
       toast({
         title: "Error",
         description: "Failed to toggle device",
@@ -185,10 +247,12 @@ export const DeviceQuickActions = () => {
   const handleDimmerChange = async (device: any, value: number[]) => {
     try {
       const level = value[0];
+      console.log(`Setting dimmer ${device.device_name} to ${level}%`);
+      
       let newStatus = { 
         ...device.status,
-        level: level,
-        state: level > 0 ? 'on' : 'off'
+        switchLevel: { value: level },
+        switch: { value: level > 0 ? 'on' : 'off' }
       };
 
       await updateDeviceStatus(device.id, newStatus);
@@ -199,6 +263,7 @@ export const DeviceQuickActions = () => {
         description: `${device.device_name} set to ${level}%`,
       });
     } catch (error) {
+      console.error('Error updating dimmer:', error);
       toast({
         title: "Error",
         description: "Failed to update dimmer",
@@ -222,7 +287,7 @@ export const DeviceQuickActions = () => {
       <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-white">
         <CardHeader>
           <CardTitle className="flex items-center">
-            <Wifi className="w-5 h-5 mr-2 text-blue-400" />
+            <Wifi className="w-6 h-6 mr-2 text-blue-400" />
             Device Quick Actions
           </CardTitle>
         </CardHeader>
@@ -248,7 +313,7 @@ export const DeviceQuickActions = () => {
     <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-white">
       <CardHeader>
         <CardTitle className="flex items-center">
-          <Wifi className="w-5 h-5 mr-2 text-blue-400" />
+          <Wifi className="w-6 h-6 mr-2 text-blue-400" />
           Device Quick Actions
         </CardTitle>
       </CardHeader>
@@ -264,8 +329,11 @@ export const DeviceQuickActions = () => {
                   {roomDevices.map((device) => {
                     const deviceType = getDeviceTypeFromCapabilities(device.capabilities, device.device_type, device.device_name);
                     const DeviceIcon = getDeviceIcon(deviceType, device.device_name);
+                    const deviceStatus = getDeviceStatus(device, deviceType);
                     const isDimmer = deviceType === 'dimmer';
-                    const currentLevel = device.status?.level || device.status?.switchLevel || (device.status?.state === 'on' ? 100 : 0);
+                    const currentLevel = deviceStatus.level || 0;
+                    
+                    console.log(`Rendering device ${device.device_name}:`, { deviceType, deviceStatus, currentLevel });
                     
                     return (
                       <div 
@@ -274,8 +342,8 @@ export const DeviceQuickActions = () => {
                       >
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center space-x-3">
-                            <div className="p-2 rounded-lg bg-white/10">
-                              <DeviceIcon className="w-4 h-4 text-blue-400" />
+                            <div className="p-3 rounded-lg bg-white/10">
+                              <DeviceIcon className="w-6 h-6 text-blue-400" />
                             </div>
                             <div>
                               <p className="font-medium text-sm">{device.device_name}</p>
@@ -283,8 +351,8 @@ export const DeviceQuickActions = () => {
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <Badge className={getStatusColor(device.status, deviceType)}>
-                              {getStatusText(device.status, deviceType)}
+                            <Badge className={getStatusColor(deviceStatus, deviceType)}>
+                              {getStatusText(deviceStatus, deviceType)}
                             </Badge>
                           </div>
                         </div>
@@ -293,13 +361,13 @@ export const DeviceQuickActions = () => {
                           <div className="space-y-3">
                             <div className="flex items-center space-x-3">
                               <Switch
-                                checked={device.status?.state === 'on'}
+                                checked={deviceStatus.state === 'on'}
                                 onCheckedChange={() => handleToggleDevice(device)}
                                 className="data-[state=checked]:bg-blue-600"
                               />
                               <span className="text-sm text-blue-200">Power</span>
                             </div>
-                            {device.status?.state === 'on' && (
+                            {deviceStatus.state === 'on' && (
                               <div className="space-y-2">
                                 <div className="flex items-center justify-between">
                                   <span className="text-sm text-blue-200">Brightness</span>
