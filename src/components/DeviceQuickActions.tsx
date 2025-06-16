@@ -358,6 +358,12 @@ export const DeviceQuickActions = () => {
         );
         
       case 'thermostat':
+        const thermostatModeValue = typeof device.status?.thermostatMode === 'string' 
+          ? device.status.thermostatMode 
+          : typeof device.status?.mode === 'string' 
+          ? device.status.mode 
+          : 'auto';
+          
         return (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -375,7 +381,7 @@ export const DeviceQuickActions = () => {
               </div>
             </div>
             <div className="text-xs text-blue-300 text-center">
-              Mode: {device.status?.thermostatMode || device.status?.mode || 'auto'}
+              Mode: {thermostatModeValue}
             </div>
           </div>
         );
