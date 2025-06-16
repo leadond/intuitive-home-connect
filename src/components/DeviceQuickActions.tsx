@@ -34,14 +34,23 @@ const getDeviceTypeFromCapabilities = (capabilities: any, deviceType: string, de
       Object.keys(comp).some(key => key.toLowerCase().includes(capName.toLowerCase()))
     );
 
-  // Check for fan speed capability first
-  if (hasCapability('fanSpeed') || hasCapability('speed')) return 'fan';
+  const name = deviceName.toLowerCase();
+
+  // Check for ceiling fan lights specifically - they should be treated as dimmers
+  if (name.includes('ceiling fan light') || name.includes('fan light')) {
+    return 'dimmer';
+  }
+
+  // Check for fan speed capability first, but exclude lights
+  if ((hasCapability('fanSpeed') || hasCapability('speed')) && !name.includes('light')) return 'fan';
   if (hasCapability('switchLevel') || hasCapability('level')) return 'dimmer';
   if (hasCapability('thermostat')) return 'thermostat';
   if (hasCapability('lock')) return 'lock';
   if (hasCapability('camera') || hasCapability('videoCamera')) return 'camera';
-  if (deviceName.toLowerCase().includes('fan')) return 'fan';
-  if (deviceName.toLowerCase().includes('tv') || deviceName.toLowerCase().includes('television')) return 'tv';
+  
+  // Name-based detection for fans (excluding lights)
+  if (name.includes('fan') && !name.includes('light')) return 'fan';
+  if (name.includes('tv') || name.includes('television')) return 'tv';
   
   return 'switch';
 };
