@@ -50,22 +50,40 @@ export const useKonnectedSync = () => {
         }
       }
 
-      console.log(`Fetching devices from Konnected at: ${webServerUrl}`);
+      console.log(`Attempting to fetch from Konnected at: ${webServerUrl}`);
 
-      // Fetch device status from Konnected web API
-      const response = await fetch(`${webServerUrl}/status`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
+      // Try to fetch device status from Konnected web API with CORS handling
+      let deviceData;
+      try {
+        const response = await fetch(`${webServerUrl}/status`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          },
+          mode: 'cors', // Explicitly set CORS mode
+        });
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch from Konnected: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        deviceData = await response.json();
+        console.log('Successfully fetched Konnected device data:', deviceData);
+      } catch (fetchError) {
+        console.error('Fetch error details:', fetchError);
+        
+        if (fetchError instanceof TypeError && fetchError.message.includes('Failed to fetch')) {
+          throw new Error(`Cannot connect to Konnected device at ${webServerUrl}. This could be due to:
+            1. CORS policy blocking the request (most common)
+            2. Device is not accessible from this network
+            3. Device is offline or unreachable
+            4. Incorrect IP address or port
+            
+            Try accessing ${webServerUrl} directly in your browser to verify it's reachable.`);
+        } else {
+          throw new Error(`Network error: ${fetchError.message}`);
+        }
       }
-
-      const deviceData = await response.json();
-      console.log('Konnected device data:', deviceData);
 
       // Process and store device data
       const devicesToStore = [];
