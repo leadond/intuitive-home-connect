@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,47 +17,58 @@ import {
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useSmartHomeData } from "@/hooks/useSmartHomeData";
+import { ClearPlatformData } from "@/components/ClearPlatformData";
 
 const Admin = () => {
   const { toast } = useToast();
+  const { platforms, addPlatform, isLoading } = useSmartHomeData();
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
 
-  const platforms = [
-    { name: "Lutron", status: "connected", description: "Lighting control system", authType: "OAuth", lastSync: "2 hours ago" },
-    { name: "Bond", status: "disconnected", description: "Ceiling fans and fireplaces", authType: "API Key", lastSync: "Never" },
-    { name: "SmartThings", status: "connected", description: "Samsung smart home hub", authType: "OAuth", lastSync: "5 minutes ago" },
-    { name: "Amazon Alexa", status: "connected", description: "Voice assistant and smart devices", authType: "OAuth", lastSync: "1 hour ago" },
-    { name: "Google Home", status: "connected", description: "Google smart home ecosystem", authType: "OAuth", lastSync: "30 minutes ago" },
-    { name: "Lockly", status: "connected", description: "Smart door locks", authType: "API Key", lastSync: "15 minutes ago" },
-    { name: "LIFX", status: "connected", description: "Smart LED lighting", authType: "API Key", lastSync: "10 minutes ago" },
-    { name: "SmartHQ", status: "error", description: "GE Appliances", authType: "OAuth", lastSync: "3 days ago" },
-    { name: "ReoLink", status: "connected", description: "Security cameras", authType: "API Key", lastSync: "5 minutes ago" },
-    { name: "MyQ", status: "connected", description: "Garage door openers", authType: "OAuth", lastSync: "1 hour ago" },
-    { name: "NEST", status: "connected", description: "Google Nest devices", authType: "OAuth", lastSync: "20 minutes ago" },
-    { name: "Apple Home", status: "pending", description: "HomeKit integration", authType: "HomeKit", lastSync: "Never" },
-    { name: "Enlighten", status: "connected", description: "Enphase solar monitoring", authType: "OAuth", lastSync: "2 hours ago" },
-    { name: "ecobee", status: "connected", description: "Smart thermostats", authType: "OAuth", lastSync: "30 minutes ago" },
-    { name: "Hubitat", status: "connected", description: "Local smart hub", authType: "API Key", lastSync: "1 minute ago" },
-    { name: "TCC Honeywell", status: "connected", description: "Total Connect Comfort", authType: "OAuth", lastSync: "45 minutes ago" },
-    { name: "Eufy", status: "connected", description: "Security and cleaning devices", authType: "API Key", lastSync: "25 minutes ago" },
-    { name: "HomeWerk", status: "disconnected", description: "Home automation platform", authType: "API Key", lastSync: "Never" },
-    { name: "Konnected", status: "connected", description: "Wired security panel", authType: "API Key", lastSync: "10 minutes ago" },
-    { name: "YoLink", status: "connected", description: "LoRa smart home devices", authType: "API Key", lastSync: "1 hour ago" },
-    { name: "Yardian", status: "connected", description: "Smart sprinkler system", authType: "OAuth", lastSync: "2 hours ago" }
+  // Available platforms that users can connect to
+  const availablePlatforms = [
+    { name: "Lutron", description: "Lighting control system", authType: "OAuth" },
+    { name: "Bond", description: "Ceiling fans and fireplaces", authType: "API Key" },
+    { name: "SmartThings", description: "Samsung smart home hub", authType: "OAuth" },
+    { name: "Amazon Alexa", description: "Voice assistant and smart devices", authType: "OAuth" },
+    { name: "Google Home", description: "Google smart home ecosystem", authType: "OAuth" },
+    { name: "Lockly", description: "Smart door locks", authType: "API Key" },
+    { name: "LIFX", description: "Smart LED lighting", authType: "API Key" },
+    { name: "SmartHQ", description: "GE Appliances", authType: "OAuth" },
+    { name: "ReoLink", description: "Security cameras", authType: "API Key" },
+    { name: "MyQ", description: "Garage door openers", authType: "OAuth" },
+    { name: "NEST", description: "Google Nest devices", authType: "OAuth" },
+    { name: "Apple Home", description: "HomeKit integration", authType: "HomeKit" },
+    { name: "Enlighten", description: "Enphase solar monitoring", authType: "OAuth" },
+    { name: "ecobee", description: "Smart thermostats", authType: "OAuth" },
+    { name: "Hubitat", description: "Local smart hub", authType: "API Key" },
+    { name: "TCC Honeywell", description: "Total Connect Comfort", authType: "OAuth" },
+    { name: "Eufy", description: "Security and cleaning devices", authType: "API Key" },
+    { name: "HomeWerk", description: "Home automation platform", authType: "API Key" },
+    { name: "Konnected", description: "Wired security panel", authType: "API Key" },
+    { name: "YoLink", description: "LoRa smart home devices", authType: "API Key" },
+    { name: "Yardian", description: "Smart sprinkler system", authType: "OAuth" }
   ];
+
+  // Create a combined list showing available platforms with their connection status
+  const platformsWithStatus = availablePlatforms.map(available => {
+    const connected = platforms.find(p => p.platform_name === available.name);
+    return {
+      ...available,
+      status: connected?.is_connected ? "connected" : "disconnected",
+      lastSync: connected?.last_sync ? new Date(connected.last_sync).toLocaleDateString() : "Never",
+      id: connected?.id
+    };
+  });
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "connected":
         return <Check className="w-4 h-4 text-green-400" />;
-      case "disconnected":
-        return <X className="w-4 h-4 text-red-400" />;
-      case "pending":
-        return <AlertCircle className="w-4 h-4 text-yellow-400" />;
-      case "error":
-        return <X className="w-4 h-4 text-red-500" />;
       default:
-        return <X className="w-4 h-4 text-gray-400" />;
+        return <X className="w-4 h-4 text-red-400" />;
     }
   };
 
@@ -66,22 +76,64 @@ const Admin = () => {
     switch (status) {
       case "connected":
         return "bg-green-600 hover:bg-green-600";
-      case "disconnected":
-        return "bg-gray-600 hover:bg-gray-600";
-      case "pending":
-        return "bg-yellow-600 hover:bg-yellow-600";
-      case "error":
-        return "bg-red-600 hover:bg-red-600";
       default:
         return "bg-gray-600 hover:bg-gray-600";
     }
   };
 
-  const handleConnect = (platformName: string) => {
-    toast({
-      title: "Integration Started",
-      description: `Connecting to ${platformName}. You'll be redirected to authenticate.`,
-    });
+  const handleConnect = (platformName: string, authType: string) => {
+    if (authType === "OAuth" || authType === "HomeKit") {
+      toast({
+        title: "OAuth Integration",
+        description: `${platformName} requires OAuth authentication. This would redirect you to ${platformName}'s login page.`,
+      });
+    } else {
+      setSelectedPlatform(platformName);
+      toast({
+        title: "API Key Required",
+        description: `Please enter your ${platformName} API key below.`,
+      });
+    }
+  };
+
+  const handleApiKeySubmit = async () => {
+    if (!selectedPlatform || !apiKey) {
+      toast({
+        title: "Missing Information",
+        description: "Please select a platform and enter an API key.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      await addPlatform({
+        platform_name: selectedPlatform,
+        platform_type: availablePlatforms.find(p => p.name === selectedPlatform)?.authType || "API Key",
+        credentials: {
+          api_key: apiKey,
+          base_url: baseUrl || undefined
+        },
+        is_connected: true
+      });
+
+      toast({
+        title: "Platform Connected",
+        description: `${selectedPlatform} has been connected successfully.`,
+      });
+
+      // Reset form
+      setSelectedPlatform(null);
+      setApiKey("");
+      setBaseUrl("");
+    } catch (error) {
+      console.error('Error connecting platform:', error);
+      toast({
+        title: "Connection Failed",
+        description: "Failed to connect platform. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleDisconnect = (platformName: string) => {
@@ -90,6 +142,14 @@ const Admin = () => {
       description: `${platformName} has been disconnected successfully.`,
     });
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
@@ -110,7 +170,7 @@ const Admin = () => {
             </div>
           </div>
           <Badge className="bg-blue-600 hover:bg-blue-600">
-            {platforms.filter(p => p.status === "connected").length} / {platforms.length} Connected
+            {platformsWithStatus.filter(p => p.status === "connected").length} / {platformsWithStatus.length} Connected
           </Badge>
         </div>
       </header>
@@ -122,9 +182,12 @@ const Admin = () => {
           <p className="text-blue-200">Manage connections to your smart home platforms and devices.</p>
         </div>
 
+        {/* Clear Data Button */}
+        <ClearPlatformData />
+
         {/* Platform Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {platforms.map((platform, index) => (
+          {platformsWithStatus.map((platform, index) => (
             <Card key={index} className="bg-white/10 backdrop-blur-sm border-white/20 hover:bg-white/15 transition-all duration-300">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -175,7 +238,7 @@ const Admin = () => {
                       <Button 
                         size="sm" 
                         className="w-full bg-green-600 hover:bg-green-700"
-                        onClick={() => handleConnect(platform.name)}
+                        onClick={() => handleConnect(platform.name, platform.authType)}
                       >
                         <LinkIcon className="w-3 h-3 mr-1" />
                         Connect
@@ -211,7 +274,7 @@ const Admin = () => {
                     onChange={(e) => setSelectedPlatform(e.target.value)}
                   >
                     <option value="">Select a platform</option>
-                    {platforms.filter(p => p.authType === "API Key").map(p => (
+                    {availablePlatforms.filter(p => p.authType === "API Key").map(p => (
                       <option key={p.name} value={p.name}>{p.name}</option>
                     ))}
                   </select>
@@ -223,6 +286,8 @@ const Admin = () => {
                     type="password"
                     placeholder="Enter your API key"
                     className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
                   />
                 </div>
                 <div>
@@ -231,6 +296,8 @@ const Admin = () => {
                     id="base-url"
                     placeholder="https://api.example.com"
                     className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
+                    value={baseUrl}
+                    onChange={(e) => setBaseUrl(e.target.value)}
                   />
                 </div>
               </div>
@@ -244,7 +311,11 @@ const Admin = () => {
                     API keys are encrypted and stored securely. They are only used to communicate with your devices and are never shared with third parties.
                   </p>
                 </div>
-                <Button className="w-full bg-blue-600 hover:bg-blue-700">
+                <Button 
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                  onClick={handleApiKeySubmit}
+                  disabled={!selectedPlatform || !apiKey}
+                >
                   <Key className="w-4 h-4 mr-2" />
                   Save Configuration
                 </Button>
