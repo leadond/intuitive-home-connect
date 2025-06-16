@@ -6,49 +6,76 @@ import {
   Shield, 
   Camera, 
   Lock, 
-  Activity,
-  Zap,
-  Home
+  Zap
 } from "lucide-react";
+import { useSmartHomeData } from "@/hooks/useSmartHomeData";
 
 export const DashboardStats = () => {
+  const { devices, isLoading } = useSmartHomeData();
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <Card key={index} className="bg-white/10 backdrop-blur-sm border-white/20 animate-pulse">
+            <CardContent className="p-4">
+              <div className="h-16 bg-white/10 rounded"></div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  const lightDevices = devices.filter(d => d.device_type === 'light');
+  const climateDevices = devices.filter(d => d.device_type === 'thermostat');
+  const securityDevices = devices.filter(d => d.device_type === 'security');
+  const cameraDevices = devices.filter(d => d.device_type === 'camera');
+  const lockDevices = devices.filter(d => d.device_type === 'lock');
+
+  const lightsOn = lightDevices.filter(d => d.status?.state === 'on').length;
+  const currentTemp = climateDevices[0]?.status?.temperature || 'N/A';
+  const securityArmed = securityDevices.some(d => d.status?.armed);
+  const camerasRecording = cameraDevices.filter(d => d.status?.recording).length;
+  const locksSecured = lockDevices.filter(d => d.status?.locked).length;
+
   const stats = [
     {
       title: "Smart Lights",
-      value: "24",
-      subtitle: "18 on, 6 off",
+      value: lightDevices.length.toString(),
+      subtitle: `${lightsOn} on, ${lightDevices.length - lightsOn} off`,
       icon: Lightbulb,
       color: "text-yellow-400",
       bgColor: "bg-yellow-400/20"
     },
     {
       title: "Climate Control",
-      value: "72°F",
-      subtitle: "Auto mode",
+      value: typeof currentTemp === 'number' ? `${currentTemp}°F` : currentTemp,
+      subtitle: climateDevices[0]?.status?.mode || "No devices",
       icon: Thermometer,
       color: "text-blue-400",
       bgColor: "bg-blue-400/20"
     },
     {
       title: "Security",
-      value: "Armed",
-      subtitle: "All sensors active",
+      value: securityArmed ? "Armed" : "Disarmed",
+      subtitle: `${securityDevices.length} sensors`,
       icon: Shield,
-      color: "text-green-400",
-      bgColor: "bg-green-400/20"
+      color: securityArmed ? "text-green-400" : "text-red-400",
+      bgColor: securityArmed ? "bg-green-400/20" : "bg-red-400/20"
     },
     {
       title: "Cameras",
-      value: "8",
-      subtitle: "All recording",
+      value: cameraDevices.length.toString(),
+      subtitle: `${camerasRecording} recording`,
       icon: Camera,
       color: "text-purple-400",
       bgColor: "bg-purple-400/20"
     },
     {
       title: "Smart Locks",
-      value: "4",
-      subtitle: "All locked",
+      value: lockDevices.length.toString(),
+      subtitle: `${locksSecured} locked`,
       icon: Lock,
       color: "text-red-400",
       bgColor: "bg-red-400/20"
@@ -56,7 +83,7 @@ export const DashboardStats = () => {
     {
       title: "Energy Usage",
       value: "2.4kW",
-      subtitle: "Below average",
+      subtitle: "Current usage",
       icon: Zap,
       color: "text-orange-400",
       bgColor: "bg-orange-400/20"

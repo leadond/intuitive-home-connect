@@ -12,14 +12,41 @@ import {
   Camera,
   Lock,
   Wifi,
-  Activity
+  Activity,
+  LogOut,
+  User
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { DashboardStats } from "@/components/DashboardStats";
 import { DeviceQuickActions } from "@/components/DeviceQuickActions";
 import { RecentActivity } from "@/components/RecentActivity";
+import { useSmartHomeData } from "@/hooks/useSmartHomeData";
 
 const Index = () => {
+  const { user, loading, signOut } = useAuth();
+  const { platforms } = useSmartHomeData();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth');
+    }
+  }, [user, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
       {/* Header */}
@@ -35,6 +62,10 @@ const Index = () => {
             </div>
           </div>
           <nav className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 text-white">
+              <User className="w-4 h-4" />
+              <span className="text-sm">{user.email}</span>
+            </div>
             <Link to="/admin">
               <Button variant="ghost" className="text-white hover:bg-white/10">
                 <Settings className="w-4 h-4 mr-2" />
@@ -47,6 +78,10 @@ const Index = () => {
                 Reports
               </Button>
             </Link>
+            <Button variant="ghost" className="text-white hover:bg-white/10" onClick={signOut}>
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
+            </Button>
           </nav>
         </div>
       </header>
@@ -87,35 +122,36 @@ const Index = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {[
-                { name: "Lutron", status: "connected", devices: 12 },
-                { name: "SmartThings", status: "connected", devices: 25 },
-                { name: "Alexa", status: "connected", devices: 18 },
-                { name: "Google Home", status: "connected", devices: 15 },
-                { name: "LIFX", status: "connected", devices: 8 },
-                { name: "Nest", status: "connected", devices: 6 },
-                { name: "ecobee", status: "connected", devices: 3 },
-                { name: "MyQ", status: "connected", devices: 2 },
-                { name: "Lockly", status: "connected", devices: 4 },
-                { name: "ReoLink", status: "connected", devices: 7 },
-                { name: "Eufy", status: "connected", devices: 5 },
-                { name: "Bond", status: "pending", devices: 0 }
-              ].map((platform) => (
-                <div key={platform.name} className="text-center p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200">
-                  <Badge 
-                    variant={platform.status === "connected" ? "default" : "secondary"}
-                    className={platform.status === "connected" ? "bg-green-600 hover:bg-green-600" : ""}
-                  >
-                    {platform.status}
-                  </Badge>
-                  <div className="mt-2">
-                    <p className="font-medium text-sm">{platform.name}</p>
-                    <p className="text-xs text-blue-200">{platform.devices} devices</p>
+            {platforms.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-blue-300 mb-4">No platforms connected yet</p>
+                <Link to="/admin">
+                  <Button className="bg-blue-600 hover:bg-blue-700">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Connect Platforms
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {platforms.map((platform) => (
+                  <div key={platform.id} className="text-center p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200">
+                    <Badge 
+                      variant={platform.is_connected ? "default" : "secondary"}
+                      className={platform.is_connected ? "bg-green-600 hover:bg-green-600" : ""}
+                    >
+                      {platform.is_connected ? "connected" : "disconnected"}
+                    </Badge>
+                    <div className="mt-2">
+                      <p className="font-medium text-sm">{platform.platform_name}</p>
+                      <p className="text-xs text-blue-200">
+                        {platform.last_sync ? `Last sync: ${new Date(platform.last_sync).toLocaleDateString()}` : 'Never synced'}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>

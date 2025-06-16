@@ -30,6 +30,82 @@ export type Database = {
         }
         Relationships: []
       }
+      device_activity_logs: {
+        Row: {
+          action: string
+          details: Json | null
+          device_id: string
+          id: string
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          details?: Json | null
+          device_id: string
+          id?: string
+          timestamp?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          details?: Json | null
+          device_id?: string
+          id?: string
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_activity_logs_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "smart_home_devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      energy_usage: {
+        Row: {
+          cost_usd: number | null
+          created_at: string
+          device_id: string | null
+          id: string
+          recorded_at: string
+          solar_generation_kwh: number | null
+          usage_kwh: number
+          user_id: string
+        }
+        Insert: {
+          cost_usd?: number | null
+          created_at?: string
+          device_id?: string | null
+          id?: string
+          recorded_at: string
+          solar_generation_kwh?: number | null
+          usage_kwh: number
+          user_id: string
+        }
+        Update: {
+          cost_usd?: number | null
+          created_at?: string
+          device_id?: string | null
+          id?: string
+          recorded_at?: string
+          solar_generation_kwh?: number | null
+          usage_kwh?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "energy_usage_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "smart_home_devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       images: {
         Row: {
           category: string
@@ -210,6 +286,92 @@ export type Database = {
           first_name?: string | null
           id?: string
           last_name?: string | null
+        }
+        Relationships: []
+      }
+      smart_home_devices: {
+        Row: {
+          capabilities: Json | null
+          created_at: string
+          device_id: string
+          device_name: string
+          device_type: string
+          id: string
+          last_updated: string
+          platform_id: string
+          room: string | null
+          status: Json | null
+          user_id: string
+        }
+        Insert: {
+          capabilities?: Json | null
+          created_at?: string
+          device_id: string
+          device_name: string
+          device_type: string
+          id?: string
+          last_updated?: string
+          platform_id: string
+          room?: string | null
+          status?: Json | null
+          user_id: string
+        }
+        Update: {
+          capabilities?: Json | null
+          created_at?: string
+          device_id?: string
+          device_name?: string
+          device_type?: string
+          id?: string
+          last_updated?: string
+          platform_id?: string
+          room?: string | null
+          status?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "smart_home_devices_platform_id_fkey"
+            columns: ["platform_id"]
+            isOneToOne: false
+            referencedRelation: "smart_home_platforms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      smart_home_platforms: {
+        Row: {
+          created_at: string
+          credentials: Json
+          id: string
+          is_connected: boolean
+          last_sync: string | null
+          platform_name: string
+          platform_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credentials: Json
+          id?: string
+          is_connected?: boolean
+          last_sync?: string | null
+          platform_name: string
+          platform_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credentials?: Json
+          id?: string
+          is_connected?: boolean
+          last_sync?: string | null
+          platform_name?: string
+          platform_type?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
