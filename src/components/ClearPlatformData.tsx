@@ -11,43 +11,8 @@ export const ClearPlatformData = () => {
     try {
       console.log('Starting complete platform data cleanup...');
       
-      // Step 1: Delete ALL activity logs first (no conditions)
-      const { error: allLogsError } = await supabase
-        .from('device_activity_logs')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // This will delete all rows
-
-      if (allLogsError) {
-        console.error('Error deleting all activity logs:', allLogsError);
-        throw allLogsError;
-      }
-      console.log('All activity logs cleared');
-
-      // Step 2: Delete ALL energy usage data (no conditions)
-      const { error: allEnergyError } = await supabase
-        .from('energy_usage')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // This will delete all rows
-
-      if (allEnergyError) {
-        console.error('Error deleting all energy usage:', allEnergyError);
-        throw allEnergyError;
-      }
-      console.log('All energy usage data cleared');
-
-      // Step 3: Delete ALL devices (no conditions)
-      const { error: devicesError } = await supabase
-        .from('smart_home_devices')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // This will delete all rows
-
-      if (devicesError) {
-        console.error('Error deleting all devices:', devicesError);
-        throw devicesError;
-      }
-      console.log('All devices cleared');
-
-      // Step 4: Delete ALL platforms (no conditions)
+      // Since we now have CASCADE DELETE, we can simply delete all platforms
+      // and the database will automatically delete all related data
       const { error: platformsError } = await supabase
         .from('smart_home_platforms')
         .delete()
@@ -57,7 +22,7 @@ export const ClearPlatformData = () => {
         console.error('Error deleting all platforms:', platformsError);
         throw platformsError;
       }
-      console.log('All platforms cleared');
+      console.log('All platforms and related data cleared via CASCADE DELETE');
 
       toast({
         title: "Data Cleared",
@@ -80,7 +45,7 @@ export const ClearPlatformData = () => {
     try {
       console.log(`Starting cleanup for ${platformName} platform...`);
       
-      // First, get the platform ID
+      // Get the platform ID
       const { data: platforms, error: platformError } = await supabase
         .from('smart_home_platforms')
         .select('id')
@@ -100,60 +65,7 @@ export const ClearPlatformData = () => {
       const platformId = platforms[0].id;
       console.log(`Found ${platformName} platform with ID:`, platformId);
 
-      // Get ALL devices for this platform
-      const { data: devices, error: devicesError } = await supabase
-        .from('smart_home_devices')
-        .select('id')
-        .eq('platform_id', platformId);
-
-      if (devicesError) throw devicesError;
-
-      const deviceIds = devices?.map(device => device.id) || [];
-      console.log(`Found ${deviceIds.length} devices for ${platformName}`);
-
-      // Step 1: Delete ALL activity logs for these devices
-      if (deviceIds.length > 0) {
-        console.log('Deleting activity logs for device IDs:', deviceIds);
-        const { error: logsError } = await supabase
-          .from('device_activity_logs')
-          .delete()
-          .in('device_id', deviceIds);
-
-        if (logsError) {
-          console.error('Error deleting activity logs:', logsError);
-          throw logsError;
-        }
-        console.log(`Activity logs cleared for ${platformName} devices`);
-      }
-
-      // Step 2: Delete ALL energy usage for these devices
-      if (deviceIds.length > 0) {
-        console.log('Deleting energy usage for device IDs:', deviceIds);
-        const { error: energyError } = await supabase
-          .from('energy_usage')
-          .delete()
-          .in('device_id', deviceIds);
-
-        if (energyError) {
-          console.error('Error deleting energy usage:', energyError);
-          throw energyError;
-        }
-        console.log(`Energy usage cleared for ${platformName} devices`);
-      }
-
-      // Step 3: Delete ALL the devices for this platform
-      const { error: deleteDevicesError } = await supabase
-        .from('smart_home_devices')
-        .delete()
-        .eq('platform_id', platformId);
-
-      if (deleteDevicesError) {
-        console.error('Error deleting devices:', deleteDevicesError);
-        throw deleteDevicesError;
-      }
-      console.log(`${platformName} devices deleted`);
-
-      // Step 4: Finally delete the platform
+      // Simply delete the platform - CASCADE DELETE will handle all related data
       const { error: deletePlatformError } = await supabase
         .from('smart_home_platforms')
         .delete()
@@ -163,7 +75,7 @@ export const ClearPlatformData = () => {
         console.error('Error deleting platform:', deletePlatformError);
         throw deletePlatformError;
       }
-      console.log(`${platformName} platform deleted`);
+      console.log(`${platformName} platform and all related data deleted via CASCADE DELETE`);
 
       toast({
         title: "Platform Removed",

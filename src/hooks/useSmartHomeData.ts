@@ -154,64 +154,10 @@ export const useSmartHomeData = () => {
 
   const removePlatform = async (platformId: string) => {
     try {
-      console.log(`Starting complete removal of platform ${platformId}...`);
+      console.log(`Starting removal of platform ${platformId}...`);
       
-      // Get ALL devices for this platform first
-      const { data: devices, error: devicesError } = await supabase
-        .from('smart_home_devices')
-        .select('id')
-        .eq('platform_id', platformId);
-
-      if (devicesError) throw devicesError;
-
-      const deviceIds = devices?.map(device => device.id) || [];
-      console.log(`Found ${deviceIds.length} devices to completely remove`);
-
-      // Step 1: Force delete ALL activity logs for these devices
-      if (deviceIds.length > 0) {
-        console.log('Force deleting ALL activity logs for device IDs:', deviceIds);
-        const { error: logsError } = await supabase
-          .from('device_activity_logs')
-          .delete()
-          .in('device_id', deviceIds);
-
-        if (logsError) {
-          console.error('Error force deleting activity logs:', logsError);
-          throw logsError;
-        }
-        console.log('All activity logs force deleted');
-      }
-
-      // Step 2: Force delete ALL energy usage data for these devices
-      if (deviceIds.length > 0) {
-        console.log('Force deleting ALL energy usage for device IDs:', deviceIds);
-        const { error: energyError } = await supabase
-          .from('energy_usage')
-          .delete()
-          .in('device_id', deviceIds);
-
-        if (energyError) {
-          console.error('Error force deleting energy usage:', energyError);
-          throw energyError;
-        }
-        console.log('All energy usage data force deleted');
-      }
-
-      // Step 3: Force delete ALL devices for this platform
-      console.log('Force deleting ALL devices for platform:', platformId);
-      const { error: deleteDevicesError } = await supabase
-        .from('smart_home_devices')
-        .delete()
-        .eq('platform_id', platformId);
-
-      if (deleteDevicesError) {
-        console.error('Error force deleting devices:', deleteDevicesError);
-        throw deleteDevicesError;
-      }
-      console.log('All devices force deleted');
-
-      // Step 4: Finally delete the platform
-      console.log('Deleting platform:', platformId);
+      // With CASCADE DELETE enabled, we can simply delete the platform
+      // and all related data will be automatically deleted
       const { error: deletePlatformError } = await supabase
         .from('smart_home_platforms')
         .delete()
@@ -221,7 +167,7 @@ export const useSmartHomeData = () => {
         console.error('Error deleting platform:', deletePlatformError);
         throw deletePlatformError;
       }
-      console.log('Platform successfully deleted');
+      console.log('Platform and all related data successfully deleted via CASCADE DELETE');
 
       await fetchAllData();
       
