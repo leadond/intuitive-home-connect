@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,10 +20,91 @@ import {
   Lamp,
   RefreshCw
 } from "lucide-react";
-import { useSmartHomeData } from "@/hooks/useSmartHomeData";
+import { useSmartHomeData, SmartHomeDevice } from "@/hooks/useSmartHomeData";
 import { useSmartThingsStatus } from "@/hooks/useSmartThingsStatus";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
+
+// Utility function to determine device type from capabilities
+const getDeviceTypeFromCapabilities = (capabilities: any, deviceType: string, deviceName: string): string => {
+  if (!capabilities || !Array.isArray(capabilities)) return 'switch';
+  
+  const hasCapability = (capName: string) => 
+    capabilities.some((comp: any) => 
+      comp && typeof comp === 'object' && 
+      Object.keys(comp).some(key => key.toLowerCase().includes(capName.toLowerCase()))
+    );
+
+  if (hasCapability('switchLevel') || hasCapability('level')) return 'dimmer';
+  if (hasCapability('thermostat')) return 'thermostat';
+  if (hasCapability('lock')) return 'lock';
+  if (hasCapability('camera') || hasCapability('videoCamera')) return 'camera';
+  if (deviceName.toLowerCase().includes('fan')) return 'fan';
+  if (deviceName.toLowerCase().includes('tv') || deviceName.toLowerCase().includes('television')) return 'tv';
+  
+  return 'switch';
+};
+
+// Utility function to get the appropriate icon for a device
+const getDeviceIcon = (deviceType: string, deviceName: string) => {
+  const name = deviceName.toLowerCase();
+  
+  if (deviceType === 'dimmer' || name.includes('light') || name.includes('lamp')) return Lightbulb;
+  if (deviceType === 'fan' || name.includes('fan')) return Fan;
+  if (deviceType === 'thermostat' || name.includes('thermostat')) return Thermometer;
+  if (deviceType === 'camera' || name.includes('camera')) return Camera;
+  if (deviceType === 'lock' || name.includes('lock')) return Lock;
+  if (deviceType === 'tv' || name.includes('tv')) return Tv;
+  if (name.includes('speaker') || name.includes('audio')) return Volume2;
+  if (name.includes('monitor')) return Monitor;
+  
+  return Power;
+};
+
+// Utility function to extract device status
+const getDeviceStatus = (device: SmartHomeDevice, deviceType: string) => {
+  if (!device.status) return { state: 'unknown', level: 0 };
+  
+  // For devices with switch capability
+  let state = 'unknown';
+  let level = 0;
+  
+  if (device.capabilities && Array.isArray(device.capabilities)) {
+    for (const component of device.capabilities) {
+      if (component && typeof component === 'object') {
+        // Check for switch state
+        if (component.switch && component.switch.switch) {
+          state = component.switch.switch.value || 'unknown';
+        }
+        // Check for level (dimmer)
+        if (component.switchLevel && component.switchLevel.level) {
+          level = component.switchLevel.level.value || 0;
+        }
+      }
+    }
+  }
+  
+  return { state, level };
+};
+
+// Utility function to get status color based on device state
+const getStatusColor = (deviceStatus: any, deviceType: string): string => {
+  if (deviceStatus.state === 'on') return 'bg-green-600 hover:bg-green-600';
+  if (deviceStatus.state === 'off') return 'bg-gray-600 hover:bg-gray-600';
+  return 'bg-yellow-600 hover:bg-yellow-600';
+};
+
+// Utility function to get status text
+const getStatusText = (deviceStatus: any, deviceType: string): string => {
+  if (deviceStatus.state === 'on') {
+    if (deviceType === 'dimmer' && deviceStatus.level > 0) {
+      return `ON (${deviceStatus.level}%)`;
+    }
+    return 'ON';
+  }
+  if (deviceStatus.state === 'off') return 'OFF';
+  return 'Unknown';
+};
 
 export const DeviceQuickActions = () => {
   const { devices, isLoading, updateDeviceStatus, logActivity } = useSmartHomeData();
@@ -49,6 +131,46 @@ export const DeviceQuickActions = () => {
     };
     
     return roomMappings[roomId] || `Room ${roomId.slice(0, 8)}`;
+  };
+
+  // Handler function for toggling devices
+  const handleToggleDevice = async (device: SmartHomeDevice) => {
+    try {
+      const deviceStatus = getDeviceStatus(device, getDeviceTypeFromCapabilities(device.capabilities, device.device_type, device.device_name));
+      const newState = deviceStatus.state === 'on' ? 'off' : 'on';
+      
+      await sendDeviceCommand(device.device_id, 'switch', newState);
+      await logActivity(device.id, `Turned ${newState}`, { newState });
+      
+      toast({
+        title: "Device Updated",
+        description: `${device.device_name} turned ${newState}`,
+      });
+      
+      // Refresh status after a short delay
+      setTimeout(() => refreshLiveStatuses(), 1000);
+    } catch (error) {
+      console.error('Error toggling device:', error);
+    }
+  };
+
+  // Handler function for dimmer changes
+  const handleDimmerChange = async (device: SmartHomeDevice, value: number[]) => {
+    try {
+      const level = value[0];
+      await sendDeviceCommand(device.device_id, 'switchLevel', 'setLevel', [level]);
+      await logActivity(device.id, `Set brightness to ${level}%`, { level });
+      
+      toast({
+        title: "Brightness Updated",
+        description: `${device.device_name} set to ${level}%`,
+      });
+      
+      // Refresh status after a short delay
+      setTimeout(() => refreshLiveStatuses(), 1000);
+    } catch (error) {
+      console.error('Error changing dimmer level:', error);
+    }
   };
 
   const refreshLiveStatuses = async () => {

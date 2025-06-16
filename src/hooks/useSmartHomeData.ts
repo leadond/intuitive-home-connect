@@ -13,6 +13,7 @@ export interface SmartHomePlatform {
 
 export interface SmartHomeDevice {
   id: string;
+  device_id: string;  // Added this property
   device_name: string;
   device_type: string;
   room: string | null;
