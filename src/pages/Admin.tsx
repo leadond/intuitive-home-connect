@@ -137,10 +137,29 @@ const Admin = () => {
         });
         return;
       }
-      credentials = {
-        api_key: apiKey,
-        base_url: baseUrl || undefined
-      };
+      
+      // Special handling for ReoLink
+      if (selectedPlatform === "ReoLink") {
+        if (!baseUrl) {
+          toast({
+            title: "Missing Camera IP",
+            description: "Please enter your ReoLink camera IP address.",
+            variant: "destructive"
+          });
+          return;
+        }
+        credentials = {
+          username: apiKey, // Using apiKey field for username
+          password: clientSecret || "", // Using clientSecret field for password
+          camera_ip: baseUrl, // Using baseUrl field for camera IP
+          port: 80 // Default port
+        };
+      } else {
+        credentials = {
+          api_key: apiKey,
+          base_url: baseUrl || undefined
+        };
+      }
     } else if (platform.authType === "OAuth") {
       if (!clientId || !clientSecret) {
         toast({
@@ -360,27 +379,65 @@ const Admin = () => {
 
                 {selectedPlatformData?.authType === "API Key" && (
                   <>
-                    <div>
-                      <Label htmlFor="api-key" className="text-white">API Key</Label>
-                      <Input 
-                        id="api-key"
-                        type="password"
-                        placeholder="Enter your API key"
-                        className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
-                        value={apiKey}
-                        onChange={(e) => setApiKey(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="base-url" className="text-white">Base URL (Optional)</Label>
-                      <Input 
-                        id="base-url"
-                        placeholder="https://api.example.com"
-                        className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
-                        value={baseUrl}
-                        onChange={(e) => setBaseUrl(e.target.value)}
-                      />
-                    </div>
+                    {selectedPlatform === "ReoLink" ? (
+                      <>
+                        <div>
+                          <Label htmlFor="camera-ip" className="text-white">Camera IP Address</Label>
+                          <Input 
+                            id="camera-ip"
+                            placeholder="192.168.1.100"
+                            className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
+                            value={baseUrl}
+                            onChange={(e) => setBaseUrl(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="username" className="text-white">Username</Label>
+                          <Input 
+                            id="username"
+                            placeholder="admin"
+                            className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="password" className="text-white">Password</Label>
+                          <Input 
+                            id="password"
+                            type="password"
+                            placeholder="Enter camera password"
+                            className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
+                            value={clientSecret}
+                            onChange={(e) => setClientSecret(e.target.value)}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <Label htmlFor="api-key" className="text-white">API Key</Label>
+                          <Input 
+                            id="api-key"
+                            type="password"
+                            placeholder="Enter your API key"
+                            className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="base-url" className="text-white">Base URL (Optional)</Label>
+                          <Input 
+                            id="base-url"
+                            placeholder="https://api.example.com"
+                            className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
+                            value={baseUrl}
+                            onChange={(e) => setBaseUrl(e.target.value)}
+                          />
+                        </div>
+                      </>
+                    )}
                   </>
                 )}
 
@@ -470,6 +527,11 @@ const Admin = () => {
                     <p className="text-sm text-blue-200">
                       Authentication: {selectedPlatformData.authType}
                     </p>
+                    {selectedPlatform === "ReoLink" && (
+                      <p className="text-sm text-blue-200 mt-2">
+                        Note: Enter your camera's local IP address and login credentials. Make sure the camera is accessible on your network.
+                      </p>
+                    )}
                   </div>
                 )}
 

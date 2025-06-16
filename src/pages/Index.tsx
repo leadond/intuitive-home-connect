@@ -24,6 +24,7 @@ import { DeviceQuickActions } from "@/components/DeviceQuickActions";
 import { RecentActivity } from "@/components/RecentActivity";
 import { SmartThingsSync } from "@/components/SmartThingsSync";
 import { KonnectedSync } from "@/components/KonnectedSync";
+import { ReoLinkSync } from "@/components/ReoLinkSync";
 import { DeleteAromatherapyDevice } from "@/components/DeleteArromatherapyDevice";
 import { useSmartHomeData } from "@/hooks/useSmartHomeData";
 
@@ -117,9 +118,10 @@ const Index = () => {
         </div>
 
         {/* Platform Management Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <SmartThingsSync />
           <KonnectedSync />
+          <ReoLinkSync />
         </div>
 
         {/* Platform Status */}
