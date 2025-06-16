@@ -246,7 +246,7 @@ export const useSmartHomeData = () => {
       console.log('Current platforms before disconnect:', platforms);
 
       // First, get all platform IDs for this platform name and user
-      const { data: platformIds, error: platformIdsError } = await supabase
+      const { data: platformData, error: platformIdsError } = await supabase
         .from('smart_home_platforms')
         .select('id')
         .eq('user_id', user.id)
@@ -257,13 +257,13 @@ export const useSmartHomeData = () => {
         throw platformIdsError;
       }
 
-      console.log(`Found ${platformIds?.length || 0} platforms to disconnect:`, platformIds);
-      const platformIdArray = platformIds?.map(p => p.id) || [];
+      console.log(`Found ${platformData?.length || 0} platforms to disconnect:`, platformData);
+      const platformIdArray = platformData?.map(p => p.id) || [];
 
       // Delete all activity logs for devices associated with these platforms
       if (platformIdArray.length > 0) {
         // Get all device IDs associated with these platforms
-        const { data: deviceIds, error: deviceIdsError } = await supabase
+        const { data: deviceData, error: deviceIdsError } = await supabase
           .from('smart_home_devices')
           .select('id')
           .eq('user_id', user.id)
@@ -271,8 +271,8 @@ export const useSmartHomeData = () => {
 
         if (deviceIdsError) {
           console.error('Error fetching device IDs:', deviceIdsError);
-        } else if (deviceIds && deviceIds.length > 0) {
-          const deviceIdArray = deviceIds.map(d => d.id);
+        } else if (deviceData && deviceData.length > 0) {
+          const deviceIdArray = deviceData.map(d => d.id);
           
           // Delete activity logs
           const { error: logsError } = await supabase
@@ -313,21 +313,23 @@ export const useSmartHomeData = () => {
 
       console.log(`Successfully deleted all ${platformName} platforms and associated data`);
       
-      // Force refresh all data to ensure UI updates
-      await fetchAllData();
-      
-      // Also update local state immediately to ensure UI responsiveness
+      // Immediately update local state BEFORE fetching new data
+      console.log('Immediately updating local state...');
       setPlatforms(prevPlatforms => {
-        const updatedPlatforms = prevPlatforms.filter(p => p.platform_name !== platformName);
-        console.log('Updated platforms state after disconnect:', updatedPlatforms);
-        return updatedPlatforms;
+        const filteredPlatforms = prevPlatforms.filter(p => p.platform_name !== platformName);
+        console.log('Platforms after immediate filter:', filteredPlatforms);
+        return filteredPlatforms;
       });
       
       setDevices(prevDevices => {
-        const updatedDevices = prevDevices.filter(d => d.platform_name !== platformName);
-        console.log('Updated devices state after disconnect:', updatedDevices);
-        return updatedDevices;
+        const filteredDevices = prevDevices.filter(d => d.platform_name !== platformName);
+        console.log('Devices after immediate filter:', filteredDevices);
+        return filteredDevices;
       });
+      
+      // Then force a complete refresh from the database
+      console.log('Fetching fresh data from database...');
+      await fetchAllData();
       
       toast({
         title: "Platform Disconnected",
