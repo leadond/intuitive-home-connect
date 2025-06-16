@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -265,6 +266,33 @@ export const DeviceQuickActions = () => {
     }
   };
 
+  const isDimmable = (device: any) => {
+    return device.device_type.toLowerCase() === 'dimmer' || 
+           (device.status?.level !== undefined && device.device_type.toLowerCase() !== 'speaker');
+  };
+
+  const isLight = (device: any) => {
+    const type = device.device_type.toLowerCase();
+    return ['light', 'bulb', 'switch', 'dimmer'].includes(type);
+  };
+
+  const isLock = (device: any) => {
+    return device.device_type.toLowerCase() === 'lock';
+  };
+
+  const isSpeaker = (device: any) => {
+    const type = device.device_type.toLowerCase();
+    return ['speaker', 'audio'].includes(type);
+  };
+
+  const isThermostat = (device: any) => {
+    return device.device_type.toLowerCase() === 'thermostat';
+  };
+
+  const isCamera = (device: any) => {
+    return device.device_type.toLowerCase() === 'camera';
+  };
+
   // Group devices by room
   const devicesByRoom = devices.reduce((acc, device) => {
     const room = device.room || 'Other';
@@ -278,128 +306,197 @@ export const DeviceQuickActions = () => {
   const hasSmartThings = platforms.some(p => p.platform_name === 'SmartThings' && p.is_connected);
 
   const renderDeviceControls = (device: any) => {
-    const deviceType = device.device_type.toLowerCase();
     const isControlling = controllingDevices.has(device.id);
+    const isOn = device.status?.switch === 'on' || device.status?.state === 'on';
     
-    switch (deviceType) {
-      case 'light':
-      case 'bulb':
-      case 'dimmer':
-        if (device.status?.level !== undefined) {
-          return (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Switch 
-                  checked={device.status?.switch === 'on'}
-                  onCheckedChange={() => handleToggleDevice(device)}
-                  disabled={isControlling}
-                  className="data-[state=checked]:bg-blue-500"
-                />
-                <span className="text-xs text-blue-300">
-                  {device.status?.level || 0}%
-                </span>
-              </div>
+    // Dimmable lights (including dimmers)
+    if (isDimmable(device) && isLight(device)) {
+      const currentLevel = device.status?.level || 0;
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <Switch 
+                checked={isOn}
+                onCheckedChange={() => handleToggleDevice(device)}
+                disabled={isControlling}
+                className={`data-[state=checked]:bg-blue-500 transition-all duration-300 ${isControlling ? 'animate-pulse' : ''}`}
+              />
+              <span className="text-xs text-blue-300 font-medium">
+                {isOn ? 'ON' : 'OFF'}
+              </span>
+            </div>
+            <div className={`text-xs font-semibold px-2 py-1 rounded-md transition-all duration-300 ${
+              isOn ? 'text-yellow-400 bg-yellow-400/20' : 'text-gray-400 bg-gray-400/20'
+            }`}>
+              {currentLevel}%
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-blue-300">Brightness</span>
+              <div className={`w-2 h-2 rounded-full transition-all duration-500 ${
+                isOn && currentLevel > 0 ? 'bg-yellow-400 animate-pulse' : 'bg-gray-500'
+              }`}></div>
+            </div>
+            <div className="relative">
               <Slider
-                value={[device.status?.level || 0]}
+                value={[currentLevel]}
                 onValueChange={(value) => handleLevelChange(device, value)}
                 max={100}
                 step={1}
-                disabled={isControlling}
-                className="w-full"
+                disabled={isControlling || !isOn}
+                className={`w-full transition-all duration-300 ${isControlling ? 'opacity-50' : ''}`}
               />
-            </div>
-          );
-        }
-        break;
-        
-      case 'speaker':
-      case 'audio':
-        return (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between space-x-2">
-              <Button 
-                size="sm" 
-                variant="ghost" 
-                className="text-white hover:bg-white/20 p-2"
-                onClick={() => handleToggleDevice(device)}
-                disabled={isControlling}
-              >
-                <Power className="w-3 h-3" />
-              </Button>
-              <div className="flex space-x-1">
-                <Button size="sm" variant="ghost" className="text-white hover:bg-white/20 p-1">
-                  <SkipBack className="w-3 h-3" />
-                </Button>
-                <Button size="sm" variant="ghost" className="text-white hover:bg-white/20 p-1">
-                  {device.status?.playing ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-                </Button>
-                <Button size="sm" variant="ghost" className="text-white hover:bg-white/20 p-1">
-                  <SkipForward className="w-3 h-3" />
-                </Button>
-              </div>
-            </div>
-            {device.status?.volume !== undefined && (
-              <div className="flex items-center space-x-2">
-                <VolumeX className="w-3 h-3 text-blue-300" />
-                <Slider
-                  value={[device.status?.volume || 0]}
-                  onValueChange={(value) => handleVolumeChange(device, value)}
-                  max={100}
-                  step={1}
-                  disabled={isControlling}
-                  className="flex-1"
-                />
-                <Volume2 className="w-3 h-3 text-blue-300" />
-              </div>
-            )}
-          </div>
-        );
-        
-      case 'thermostat':
-        // Ensure thermostatModeValue is always a string
-        let thermostatModeValue = 'auto';
-        if (typeof device.status?.thermostatMode === 'string') {
-          thermostatModeValue = device.status.thermostatMode;
-        } else if (typeof device.status?.mode === 'string') {
-          thermostatModeValue = device.status.mode;
-        }
-          
-        return (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-blue-300">Target:</span>
-              <div className="flex items-center space-x-1">
-                <Button size="sm" variant="ghost" className="text-white hover:bg-white/20 p-1">
-                  <Minus className="w-3 h-3" />
-                </Button>
-                <span className="text-xs text-white min-w-[3rem] text-center">
-                  {device.status?.thermostatSetpoint || device.status?.temperature || '--'}°
-                </span>
-                <Button size="sm" variant="ghost" className="text-white hover:bg-white/20 p-1">
-                  <Plus className="w-3 h-3" />
-                </Button>
-              </div>
-            </div>
-            <div className="text-xs text-blue-300 text-center">
-              Mode: {thermostatModeValue}
+              <div 
+                className={`absolute top-0 left-0 h-full bg-gradient-to-r from-yellow-200 to-yellow-400 rounded-full transition-all duration-500 pointer-events-none ${
+                  isOn ? 'opacity-30' : 'opacity-0'
+                }`}
+                style={{ width: `${currentLevel}%` }}
+              ></div>
             </div>
           </div>
-        );
-        
-      default:
-        return (
-          <Button 
-            size="sm" 
-            variant="ghost" 
-            className="text-white hover:bg-white/20 p-2 transition-all duration-200 hover:scale-105"
-            onClick={() => handleToggleDevice(device)}
-            disabled={isControlling}
-          >
-            <Power className={`w-4 h-4 transition-all duration-300 ${isControlling ? 'animate-spin' : ''}`} />
-          </Button>
-        );
+        </div>
+      );
     }
     
+    // Regular lights/switches
+    if (isLight(device)) {
+      return (
+        <div className="flex items-center justify-between">
+          <Switch 
+            checked={isOn}
+            onCheckedChange={() => handleToggleDevice(device)}
+            disabled={isControlling}
+            className={`data-[state=checked]:bg-blue-500 transition-all duration-300 ${isControlling ? 'animate-pulse' : ''}`}
+          />
+          <span className={`text-xs font-medium transition-all duration-300 ${
+            isOn ? 'text-green-400' : 'text-gray-400'
+          }`}>
+            {isOn ? 'ON' : 'OFF'}
+          </span>
+        </div>
+      );
+    }
+    
+    // Locks
+    if (isLock(device)) {
+      const isLocked = device.status?.lock === 'locked' || device.status?.locked;
+      return (
+        <div className="flex items-center justify-between">
+          <Switch 
+            checked={isLocked}
+            onCheckedChange={() => handleToggleDevice(device)}
+            disabled={isControlling}
+            className={`data-[state=checked]:bg-green-500 transition-all duration-300 ${isControlling ? 'animate-pulse' : ''}`}
+          />
+          <span className={`text-xs font-medium transition-all duration-300 ${
+            isLocked ? 'text-green-400' : 'text-red-400'
+          }`}>
+            {isLocked ? 'LOCKED' : 'UNLOCKED'}
+          </span>
+        </div>
+      );
+    }
+    
+    // Speakers
+    if (isSpeaker(device)) {
+      return (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between space-x-2">
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="text-white hover:bg-white/20 p-2"
+              onClick={() => handleToggleDevice(device)}
+              disabled={isControlling}
+            >
+              <Power className="w-3 h-3" />
+            </Button>
+            <div className="flex space-x-1">
+              <Button size="sm" variant="ghost" className="text-white hover:bg-white/20 p-1">
+                <SkipBack className="w-3 h-3" />
+              </Button>
+              <Button size="sm" variant="ghost" className="text-white hover:bg-white/20 p-1">
+                {device.status?.playing ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+              </Button>
+              <Button size="sm" variant="ghost" className="text-white hover:bg-white/20 p-1">
+                <SkipForward className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
+          {device.status?.volume !== undefined && (
+            <div className="flex items-center space-x-2">
+              <VolumeX className="w-3 h-3 text-blue-300" />
+              <Slider
+                value={[device.status?.volume || 0]}
+                onValueChange={(value) => handleVolumeChange(device, value)}
+                max={100}
+                step={1}
+                disabled={isControlling}
+                className="flex-1"
+              />
+              <Volume2 className="w-3 h-3 text-blue-300" />
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    // Thermostats
+    if (isThermostat(device)) {
+      let thermostatModeValue = 'auto';
+      if (typeof device.status?.thermostatMode === 'string') {
+        thermostatModeValue = device.status.thermostatMode;
+      } else if (typeof device.status?.mode === 'string') {
+        thermostatModeValue = device.status.mode;
+      }
+        
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-blue-300">Target:</span>
+            <div className="flex items-center space-x-1">
+              <Button size="sm" variant="ghost" className="text-white hover:bg-white/20 p-1">
+                <Minus className="w-3 h-3" />
+              </Button>
+              <span className="text-xs text-white min-w-[3rem] text-center">
+                {device.status?.thermostatSetpoint || device.status?.temperature || '--'}°
+              </span>
+              <Button size="sm" variant="ghost" className="text-white hover:bg-white/20 p-1">
+                <Plus className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
+          <div className="text-xs text-blue-300 text-center">
+            Mode: {thermostatModeValue}
+          </div>
+        </div>
+      );
+    }
+    
+    // Cameras
+    if (isCamera(device)) {
+      const isRecording = device.status?.recording;
+      return (
+        <div className="flex items-center justify-between">
+          <Switch 
+            checked={isRecording}
+            onCheckedChange={() => handleToggleDevice(device)}
+            disabled={isControlling}
+            className={`data-[state=checked]:bg-red-500 transition-all duration-300 ${isControlling ? 'animate-pulse' : ''}`}
+          />
+          <span className={`text-xs font-medium transition-all duration-300 ${
+            isRecording ? 'text-red-400' : 'text-gray-400'
+          }`}>
+            {isRecording ? 'RECORDING' : 'IDLE'}
+          </span>
+        </div>
+      );
+    }
+    
+    // Default control for other devices
     return (
       <Button 
         size="sm" 
