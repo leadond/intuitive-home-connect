@@ -169,15 +169,6 @@ export const useSmartHomeData = () => {
     try {
       console.log(`Controlling device ${deviceId} with command ${command}:`, value);
       
-      // Find the device to get external_device_id
-      const device = devices.find(d => d.id === deviceId);
-      if (!device) {
-        throw new Error('Device not found');
-      }
-
-      // Use external_device_id if available, fallback to internal id
-      const externalDeviceId = device.external_device_id || deviceId;
-      
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('Not authenticated');
@@ -188,7 +179,7 @@ export const useSmartHomeData = () => {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: {
-          deviceId: externalDeviceId,
+          deviceId: deviceId, // Use the internal database ID directly
           command,
           value
         }
@@ -201,18 +192,8 @@ export const useSmartHomeData = () => {
 
       console.log('Device control response:', response.data);
       
-      // Update local status optimistically
-      const newStatus = { ...device.status };
-      if (command === 'switch') {
-        newStatus.switch = value;
-      } else if (command === 'switchLevel') {
-        newStatus.level = value;
-        if (value > 0) newStatus.switch = 'on';
-      } else if (command === 'lock') {
-        newStatus.lock = value;
-      }
-      
-      await updateDeviceStatus(deviceId, newStatus);
+      // Refresh devices to get updated status
+      await fetchDevices();
       
       return response.data;
     } catch (error) {
