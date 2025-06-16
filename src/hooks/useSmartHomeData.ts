@@ -243,6 +243,7 @@ export const useSmartHomeData = () => {
       if (!user) throw new Error('User not authenticated');
 
       console.log(`Starting disconnect process for platform: ${platformName}`);
+      console.log('Current platforms before disconnect:', platforms);
 
       // First, get all platform IDs for this platform name and user
       const { data: platformIds, error: platformIdsError } = await supabase
@@ -311,7 +312,22 @@ export const useSmartHomeData = () => {
       if (platformError) throw platformError;
 
       console.log(`Successfully deleted all ${platformName} platforms and associated data`);
-      await fetchAllData(); // Refresh all data
+      
+      // Force refresh all data to ensure UI updates
+      await fetchAllData();
+      
+      // Also update local state immediately to ensure UI responsiveness
+      setPlatforms(prevPlatforms => {
+        const updatedPlatforms = prevPlatforms.filter(p => p.platform_name !== platformName);
+        console.log('Updated platforms state after disconnect:', updatedPlatforms);
+        return updatedPlatforms;
+      });
+      
+      setDevices(prevDevices => {
+        const updatedDevices = prevDevices.filter(d => d.platform_name !== platformName);
+        console.log('Updated devices state after disconnect:', updatedDevices);
+        return updatedDevices;
+      });
       
       toast({
         title: "Platform Disconnected",
