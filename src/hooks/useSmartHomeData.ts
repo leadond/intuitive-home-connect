@@ -245,7 +245,7 @@ export const useSmartHomeData = () => {
 
       console.log(`=== Starting complete disconnect for platform: ${platformName} ===`);
       
-      // Step 1: First get all platform IDs for this platform name and user
+      // Step 1: Get all platform IDs for this platform name and user
       const { data: platformsToDelete, error: fetchError } = await supabase
         .from('smart_home_platforms')
         .select('id')
@@ -260,22 +260,57 @@ export const useSmartHomeData = () => {
       const platformIds = platformsToDelete?.map(p => p.id) || [];
       console.log(`Found ${platformIds.length} platforms to delete:`, platformIds);
 
-      // Step 2: Delete ALL devices associated with these platforms first
+      if (platformIds.length === 0) {
+        console.log('No platforms found to delete');
+        return;
+      }
+
+      // Step 2: Get all device IDs for these platforms
+      const { data: devicesToDelete, error: devicesError } = await supabase
+        .from('smart_home_devices')
+        .select('id')
+        .eq('user_id', user.id)
+        .in('platform_id', platformIds);
+
+      if (devicesError) {
+        console.error('Error fetching devices:', devicesError);
+        throw devicesError;
+      }
+
+      const deviceIds = devicesToDelete?.map(d => d.id) || [];
+      console.log(`Found ${deviceIds.length} devices to delete:`, deviceIds);
+
+      // Step 3: Delete all activity logs for these devices first
+      if (deviceIds.length > 0) {
+        const { error: logsError } = await supabase
+          .from('device_activity_logs')
+          .delete()
+          .eq('user_id', user.id)
+          .in('device_id', deviceIds);
+
+        if (logsError) {
+          console.error('Error deleting activity logs:', logsError);
+          throw logsError;
+        }
+        console.log('Successfully deleted all activity logs for devices');
+      }
+
+      // Step 4: Delete all devices for these platforms
       if (platformIds.length > 0) {
-        const { error: devicesError } = await supabase
+        const { error: deleteDevicesError } = await supabase
           .from('smart_home_devices')
           .delete()
           .eq('user_id', user.id)
           .in('platform_id', platformIds);
 
-        if (devicesError) {
-          console.error('Error deleting devices:', devicesError);
-          throw devicesError;
+        if (deleteDevicesError) {
+          console.error('Error deleting devices:', deleteDevicesError);
+          throw deleteDevicesError;
         }
         console.log('Successfully deleted all devices for platforms');
       }
 
-      // Step 3: Now delete all platforms for this user and platform name
+      // Step 5: Finally delete all platforms for this user and platform name
       const { error: deleteError } = await supabase
         .from('smart_home_platforms')
         .delete()
@@ -289,7 +324,7 @@ export const useSmartHomeData = () => {
 
       console.log(`Successfully force-deleted all ${platformName} data`);
       
-      // Step 4: Immediately clear local state
+      // Step 6: Immediately clear local state
       setPlatforms(prevPlatforms => {
         const filtered = prevPlatforms.filter(p => p.platform_name !== platformName);
         console.log('Platforms after immediate filter:', filtered);
@@ -302,7 +337,7 @@ export const useSmartHomeData = () => {
         return filtered;
       });
       
-      // Step 5: Force refresh from database to ensure consistency
+      // Step 7: Force refresh from database to ensure consistency
       await fetchAllData();
       
       toast({
