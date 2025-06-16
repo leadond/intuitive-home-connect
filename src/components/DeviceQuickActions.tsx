@@ -77,14 +77,14 @@ const getDeviceStatus = (device: SmartHomeDevice, deviceType: string, liveStatus
       state = mainComponent.switch.switch.value;
     }
     
-    // Check for level (dimmer)
-    if (mainComponent.switchLevel && mainComponent.switchLevel.level && mainComponent.switchLevel.level.value !== undefined) {
+    // Check for level (dimmer) - only for non-fan devices
+    if (deviceType !== 'fan' && mainComponent.switchLevel && mainComponent.switchLevel.level && mainComponent.switchLevel.level.value !== undefined) {
       level = mainComponent.switchLevel.level.value;
     }
     
-    // Check for fan speed
-    if (mainComponent.fanSpeed && mainComponent.fanSpeed.speed && mainComponent.fanSpeed.speed.value !== undefined) {
-      fanSpeed = mainComponent.fanSpeed.speed.value;
+    // Check for fan speed - only for fan devices
+    if (deviceType === 'fan' && mainComponent.fanSpeed && mainComponent.fanSpeed.fanSpeed && mainComponent.fanSpeed.fanSpeed.value !== undefined) {
+      fanSpeed = mainComponent.fanSpeed.fanSpeed.value;
     }
   }
   
@@ -96,13 +96,13 @@ const getDeviceStatus = (device: SmartHomeDevice, deviceType: string, liveStatus
         if (component.switch && component.switch.switch) {
           state = component.switch.switch.value || 'unknown';
         }
-        // Check for level (dimmer)
-        if (component.switchLevel && component.switchLevel.level) {
+        // Check for level (dimmer) - only for non-fan devices
+        if (deviceType !== 'fan' && component.switchLevel && component.switchLevel.level) {
           level = component.switchLevel.level.value || 0;
         }
-        // Check for fan speed
-        if (component.fanSpeed && component.fanSpeed.speed) {
-          fanSpeed = component.fanSpeed.speed.value || 0;
+        // Check for fan speed - only for fan devices
+        if (deviceType === 'fan' && component.fanSpeed && component.fanSpeed.fanSpeed) {
+          fanSpeed = component.fanSpeed.fanSpeed.value || 0;
         }
       }
     }
@@ -118,7 +118,7 @@ const getStatusColor = (deviceStatus: any, deviceType: string): string => {
   return 'bg-yellow-600 hover:bg-yellow-600';
 };
 
-// Utility function to get status text
+// Updated utility function to get status text
 const getStatusText = (deviceStatus: any, deviceType: string): string => {
   if (deviceStatus.state === 'on') {
     if (deviceType === 'dimmer' && deviceStatus.level > 0) {
@@ -205,7 +205,7 @@ export const DeviceQuickActions = () => {
   const handleFanSpeedChange = async (device: SmartHomeDevice, value: number[]) => {
     try {
       const speed = value[0];
-      await sendDeviceCommand(device.device_id, 'fanSpeed', 'setSpeed', [speed]);
+      await sendDeviceCommand(device.device_id, 'fanSpeed', 'setFanSpeed', [speed]);
       await logActivity(device.id, `Set fan speed to ${speed}`, { speed });
       
       toast({
@@ -382,8 +382,10 @@ export const DeviceQuickActions = () => {
                             </div>
                             <div className="space-y-2">
                               <div className="flex items-center justify-between">
-                                <span className="text-sm text-blue-200">Speed</span>
-                                <span className="text-sm text-white">{currentFanSpeed}</span>
+                                <span className="text-sm text-blue-200">Fan Speed</span>
+                                <span className="text-sm text-white">
+                                  {currentFanSpeed === 0 ? 'Off' : `Speed ${currentFanSpeed}`}
+                                </span>
                               </div>
                               <Slider
                                 value={[currentFanSpeed]}
@@ -394,6 +396,13 @@ export const DeviceQuickActions = () => {
                                 disabled={isUpdating}
                                 className="w-full"
                               />
+                              <div className="flex justify-between text-xs text-blue-300">
+                                <span>Off</span>
+                                <span>1</span>
+                                <span>2</span>
+                                <span>3</span>
+                                <span>4</span>
+                              </div>
                             </div>
                           </div>
                         ) : (
