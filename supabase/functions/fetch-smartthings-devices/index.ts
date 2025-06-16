@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -50,6 +51,51 @@ serve(async (req) => {
 
     const credentials = platforms.credentials as { api_key: string; base_url?: string }
     const baseUrl = credentials.base_url || 'https://api.smartthings.com/v1'
+
+    // First, fetch all locations and their rooms to create a lookup map
+    console.log('Fetching locations and rooms...')
+    const locationsResponse = await fetch(`${baseUrl}/locations`, {
+      headers: {
+        'Authorization': `Bearer ${credentials.api_key}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    })
+
+    let roomLookup = new Map<string, string>()
+    
+    if (locationsResponse.ok) {
+      const locationsData = await locationsResponse.json()
+      const locations = locationsData.items || []
+      
+      // For each location, fetch its rooms
+      for (const location of locations) {
+        try {
+          const roomsResponse = await fetch(`${baseUrl}/locations/${location.locationId}/rooms`, {
+            headers: {
+              'Authorization': `Bearer ${credentials.api_key}`,
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            }
+          })
+          
+          if (roomsResponse.ok) {
+            const roomsData = await roomsResponse.json()
+            const rooms = roomsData.items || []
+            
+            // Add each room to our lookup map
+            rooms.forEach((room: any) => {
+              roomLookup.set(room.roomId, room.name)
+              console.log(`Room mapping: ${room.roomId} -> ${room.name}`)
+            })
+          }
+        } catch (roomFetchError) {
+          console.error(`Error fetching rooms for location ${location.locationId}:`, roomFetchError)
+        }
+      }
+    } else {
+      console.error('Failed to fetch locations:', await locationsResponse.text())
+    }
 
     // Fetch devices from SmartThings API
     const devicesResponse = await fetch(`${baseUrl}/devices`, {
@@ -113,25 +159,11 @@ serve(async (req) => {
         }
       }
 
-      // Get room name from location
+      // Get room name from our lookup map
       let roomName = null
       if (device.roomId) {
-        try {
-          const roomResponse = await fetch(`${baseUrl}/locations/${device.locationId}/rooms/${device.roomId}`, {
-            headers: {
-              'Authorization': `Bearer ${credentials.api_key}`,
-              'Accept': 'application/json',
-              'Content-Type': 'application/json'
-            }
-          })
-          
-          if (roomResponse.ok) {
-            const roomData = await roomResponse.json()
-            roomName = roomData.name
-          }
-        } catch (roomError) {
-          console.error(`Error fetching room for device ${device.deviceId}:`, roomError)
-        }
+        roomName = roomLookup.get(device.roomId) || null
+        console.log(`Device ${device.deviceId} room mapping: ${device.roomId} -> ${roomName}`)
       }
 
       // Use a more meaningful device name
@@ -177,7 +209,8 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         devices_synced: devices.length,
-        message: `Successfully synced ${devices.length} devices from SmartThings`
+        rooms_found: roomLookup.size,
+        message: `Successfully synced ${devices.length} devices from SmartThings with ${roomLookup.size} rooms mapped`
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
