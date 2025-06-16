@@ -1,6 +1,9 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { 
   Lightbulb, 
   Fan, 
@@ -9,7 +12,10 @@ import {
   Lock, 
   Tv,
   Volume2,
-  Wifi
+  Wifi,
+  Power,
+  Zap,
+  Monitor
 } from "lucide-react";
 import { useSmartHomeData } from "@/hooks/useSmartHomeData";
 import { useToast } from "@/hooks/use-toast";
@@ -39,8 +45,39 @@ export const DeviceQuickActions = () => {
     return roomMappings[roomId] || `Room ${roomId.slice(0, 8)}`; // Show first 8 chars of ID if no mapping found
   };
 
-  const getDeviceIcon = (type: string) => {
+  const getDeviceTypeFromCapabilities = (capabilities: any[], deviceType: string, deviceName: string) => {
+    if (!capabilities || !Array.isArray(capabilities)) return deviceType;
+    
+    const capabilityIds = capabilities.flatMap(comp => 
+      comp.capabilities ? comp.capabilities.map((cap: any) => cap.id) : []
+    );
+    
+    const deviceNameLower = deviceName.toLowerCase();
+    
+    // Check for dimmer capabilities
+    if (capabilityIds.includes('switchLevel') || capabilityIds.includes('colorControl')) {
+      return 'dimmer';
+    }
+    
+    // Check for specific device types based on capabilities and name
+    if (capabilityIds.includes('lock')) return 'lock';
+    if (capabilityIds.includes('thermostat') || capabilityIds.includes('temperatureMeasurement')) return 'thermostat';
+    if (capabilityIds.includes('videoCamera') || deviceNameLower.includes('camera')) return 'camera';
+    if (capabilityIds.includes('fanSpeed') || deviceNameLower.includes('fan')) return 'fan';
+    if (capabilityIds.includes('switch') && (deviceNameLower.includes('tv') || deviceNameLower.includes('television'))) return 'tv';
+    if (capabilityIds.includes('audioVolume') || deviceNameLower.includes('speaker')) return 'speaker';
+    if (capabilityIds.includes('switch') && deviceNameLower.includes('outlet')) return 'outlet';
+    if (capabilityIds.includes('switch') && (deviceNameLower.includes('light') || deviceNameLower.includes('lamp'))) return 'light';
+    if (capabilityIds.includes('switch')) return 'switch';
+    
+    return deviceType;
+  };
+
+  const getDeviceIcon = (type: string, deviceName: string) => {
+    const deviceNameLower = deviceName.toLowerCase();
+    
     switch (type) {
+      case 'dimmer': return Lightbulb;
       case 'light': return Lightbulb;
       case 'fan': return Fan;
       case 'thermostat': return Thermometer;
@@ -48,7 +85,17 @@ export const DeviceQuickActions = () => {
       case 'lock': return Lock;
       case 'tv': return Tv;
       case 'speaker': return Volume2;
-      default: return Wifi;
+      case 'outlet': return Zap;
+      case 'switch': return Power;
+      default: 
+        // Fallback based on device name
+        if (deviceNameLower.includes('light') || deviceNameLower.includes('lamp')) return Lightbulb;
+        if (deviceNameLower.includes('fan')) return Fan;
+        if (deviceNameLower.includes('tv') || deviceNameLower.includes('monitor')) return Monitor;
+        if (deviceNameLower.includes('camera')) return Camera;
+        if (deviceNameLower.includes('lock')) return Lock;
+        if (deviceNameLower.includes('speaker')) return Volume2;
+        return Wifi;
     }
   };
 
@@ -56,6 +103,7 @@ export const DeviceQuickActions = () => {
     if (!status) return "bg-gray-600 hover:bg-gray-600";
     
     switch (type) {
+      case 'dimmer':
       case 'light':
         return status.state === 'on' ? "bg-green-600 hover:bg-green-600" : "bg-gray-600 hover:bg-gray-600";
       case 'lock':
@@ -73,6 +121,10 @@ export const DeviceQuickActions = () => {
     if (!status) return "unknown";
     
     switch (type) {
+      case 'dimmer':
+        if (status.state === 'off') return 'off';
+        const level = status.level || status.switchLevel || 100;
+        return `${level}%`;
       case 'light':
         return status.state || "off";
       case 'lock':
@@ -89,8 +141,18 @@ export const DeviceQuickActions = () => {
   const handleToggleDevice = async (device: any) => {
     try {
       let newStatus = { ...device.status };
+      const deviceType = getDeviceTypeFromCapabilities(device.capabilities, device.device_type, device.device_name);
       
-      switch (device.device_type) {
+      switch (deviceType) {
+        case 'dimmer':
+          if (device.status?.state === 'on') {
+            newStatus.state = 'off';
+            newStatus.level = 0;
+          } else {
+            newStatus.state = 'on';
+            newStatus.level = device.status?.level || 100;
+          }
+          break;
         case 'light':
           newStatus.state = device.status?.state === 'on' ? 'off' : 'on';
           break;
@@ -109,12 +171,37 @@ export const DeviceQuickActions = () => {
       
       toast({
         title: "Device Updated",
-        description: `${device.device_name} has been ${getStatusText(newStatus, device.device_type)}`,
+        description: `${device.device_name} has been ${getStatusText(newStatus, deviceType)}`,
       });
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to toggle device",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDimmerChange = async (device: any, value: number[]) => {
+    try {
+      const level = value[0];
+      let newStatus = { 
+        ...device.status,
+        level: level,
+        state: level > 0 ? 'on' : 'off'
+      };
+
+      await updateDeviceStatus(device.id, newStatus);
+      await logActivity(device.id, `Dimmer ${device.device_name} set to ${level}%`);
+      
+      toast({
+        title: "Dimmer Updated",
+        description: `${device.device_name} set to ${level}%`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update dimmer",
         variant: "destructive"
       });
     }
@@ -173,36 +260,73 @@ export const DeviceQuickActions = () => {
             Object.entries(devicesByRoom).map(([room, roomDevices]) => (
               <div key={room}>
                 <h3 className="text-lg font-semibold text-blue-200 mb-3">{room}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-4">
                   {roomDevices.map((device) => {
-                    const DeviceIcon = getDeviceIcon(device.device_type);
+                    const deviceType = getDeviceTypeFromCapabilities(device.capabilities, device.device_type, device.device_name);
+                    const DeviceIcon = getDeviceIcon(deviceType, device.device_name);
+                    const isDimmer = deviceType === 'dimmer';
+                    const currentLevel = device.status?.level || device.status?.switchLevel || (device.status?.state === 'on' ? 100 : 0);
+                    
                     return (
                       <div 
                         key={device.id}
-                        className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200"
+                        className="p-4 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200"
                       >
-                        <div className="flex items-center space-x-3">
-                          <div className="p-2 rounded-lg bg-white/10">
-                            <DeviceIcon className="w-4 h-4 text-blue-400" />
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-3">
+                            <div className="p-2 rounded-lg bg-white/10">
+                              <DeviceIcon className="w-4 h-4 text-blue-400" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">{device.device_name}</p>
+                              <p className="text-xs text-blue-300">{device.platform_name}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium text-sm">{device.device_name}</p>
-                            <p className="text-xs text-blue-300">{device.platform_name}</p>
+                          <div className="flex items-center space-x-2">
+                            <Badge className={getStatusColor(device.status, deviceType)}>
+                              {getStatusText(device.status, deviceType)}
+                            </Badge>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <Badge className={getStatusColor(device.status, device.device_type)}>
-                            {getStatusText(device.status, device.device_type)}
-                          </Badge>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            className="text-white hover:bg-white/20"
-                            onClick={() => handleToggleDevice(device)}
-                          >
-                            Toggle
-                          </Button>
-                        </div>
+                        
+                        {isDimmer ? (
+                          <div className="space-y-3">
+                            <div className="flex items-center space-x-3">
+                              <Switch
+                                checked={device.status?.state === 'on'}
+                                onCheckedChange={() => handleToggleDevice(device)}
+                                className="data-[state=checked]:bg-blue-600"
+                              />
+                              <span className="text-sm text-blue-200">Power</span>
+                            </div>
+                            {device.status?.state === 'on' && (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-blue-200">Brightness</span>
+                                  <span className="text-sm text-white">{currentLevel}%</span>
+                                </div>
+                                <Slider
+                                  value={[currentLevel]}
+                                  onValueChange={(value) => handleDimmerChange(device, value)}
+                                  max={100}
+                                  step={1}
+                                  className="w-full"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex justify-center">
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="text-white hover:bg-white/20"
+                              onClick={() => handleToggleDevice(device)}
+                            >
+                              Toggle
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
