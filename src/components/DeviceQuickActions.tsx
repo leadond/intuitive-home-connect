@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +17,19 @@ import { useToast } from "@/hooks/use-toast";
 export const DeviceQuickActions = () => {
   const { devices, isLoading, updateDeviceStatus, logActivity } = useSmartHomeData();
   const { toast } = useToast();
+
+  // Function to convert room IDs to readable room names
+  const getRoomName = (roomId: string | null) => {
+    if (!roomId) return 'Other';
+    
+    // Common SmartThings room ID mappings - you can expand this based on your actual room IDs
+    const roomMappings: Record<string, string> = {
+      'fd2f09e3-063f-4d56-906f-c891312822e6': 'Master Bedroom',
+      // Add more room ID mappings as needed
+    };
+    
+    return roomMappings[roomId] || roomId; // Fallback to ID if no mapping found
+  };
 
   const getDeviceIcon = (type: string) => {
     switch (type) {
@@ -100,13 +112,13 @@ export const DeviceQuickActions = () => {
     }
   };
 
-  // Group devices by room
+  // Group devices by room using the room name mapping
   const devicesByRoom = devices.reduce((acc, device) => {
-    const room = device.room || 'Other';
-    if (!acc[room]) {
-      acc[room] = [];
+    const roomName = getRoomName(device.room);
+    if (!acc[roomName]) {
+      acc[roomName] = [];
     }
-    acc[room].push(device);
+    acc[roomName].push(device);
     return acc;
   }, {} as Record<string, typeof devices>);
 
