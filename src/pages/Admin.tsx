@@ -1,0 +1,260 @@
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { 
+  Settings, 
+  Home, 
+  Link as LinkIcon, 
+  Check, 
+  X, 
+  Key, 
+  Shield,
+  Wifi,
+  AlertCircle
+} from "lucide-react";
+import { Link } from "react-router-dom";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+
+const Admin = () => {
+  const { toast } = useToast();
+  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
+
+  const platforms = [
+    { name: "Lutron", status: "connected", description: "Lighting control system", authType: "OAuth", lastSync: "2 hours ago" },
+    { name: "Bond", status: "disconnected", description: "Ceiling fans and fireplaces", authType: "API Key", lastSync: "Never" },
+    { name: "SmartThings", status: "connected", description: "Samsung smart home hub", authType: "OAuth", lastSync: "5 minutes ago" },
+    { name: "Amazon Alexa", status: "connected", description: "Voice assistant and smart devices", authType: "OAuth", lastSync: "1 hour ago" },
+    { name: "Google Home", status: "connected", description: "Google smart home ecosystem", authType: "OAuth", lastSync: "30 minutes ago" },
+    { name: "Lockly", status: "connected", description: "Smart door locks", authType: "API Key", lastSync: "15 minutes ago" },
+    { name: "LIFX", status: "connected", description: "Smart LED lighting", authType: "API Key", lastSync: "10 minutes ago" },
+    { name: "SmartHQ", status: "error", description: "GE Appliances", authType: "OAuth", lastSync: "3 days ago" },
+    { name: "ReoLink", status: "connected", description: "Security cameras", authType: "API Key", lastSync: "5 minutes ago" },
+    { name: "MyQ", status: "connected", description: "Garage door openers", authType: "OAuth", lastSync: "1 hour ago" },
+    { name: "NEST", status: "connected", description: "Google Nest devices", authType: "OAuth", lastSync: "20 minutes ago" },
+    { name: "Apple Home", status: "pending", description: "HomeKit integration", authType: "HomeKit", lastSync: "Never" },
+    { name: "Enlighten", status: "connected", description: "Enphase solar monitoring", authType: "OAuth", lastSync: "2 hours ago" },
+    { name: "ecobee", status: "connected", description: "Smart thermostats", authType: "OAuth", lastSync: "30 minutes ago" },
+    { name: "Hubitat", status: "connected", description: "Local smart hub", authType: "API Key", lastSync: "1 minute ago" },
+    { name: "TCC Honeywell", status: "connected", description: "Total Connect Comfort", authType: "OAuth", lastSync: "45 minutes ago" },
+    { name: "Eufy", status: "connected", description: "Security and cleaning devices", authType: "API Key", lastSync: "25 minutes ago" },
+    { name: "HomeWerk", status: "disconnected", description: "Home automation platform", authType: "API Key", lastSync: "Never" },
+    { name: "Konnected", status: "connected", description: "Wired security panel", authType: "API Key", lastSync: "10 minutes ago" },
+    { name: "YoLink", status: "connected", description: "LoRa smart home devices", authType: "API Key", lastSync: "1 hour ago" },
+    { name: "Yardian", status: "connected", description: "Smart sprinkler system", authType: "OAuth", lastSync: "2 hours ago" }
+  ];
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "connected":
+        return <Check className="w-4 h-4 text-green-400" />;
+      case "disconnected":
+        return <X className="w-4 h-4 text-red-400" />;
+      case "pending":
+        return <AlertCircle className="w-4 h-4 text-yellow-400" />;
+      case "error":
+        return <X className="w-4 h-4 text-red-500" />;
+      default:
+        return <X className="w-4 h-4 text-gray-400" />;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "connected":
+        return "bg-green-600 hover:bg-green-600";
+      case "disconnected":
+        return "bg-gray-600 hover:bg-gray-600";
+      case "pending":
+        return "bg-yellow-600 hover:bg-yellow-600";
+      case "error":
+        return "bg-red-600 hover:bg-red-600";
+      default:
+        return "bg-gray-600 hover:bg-gray-600";
+    }
+  };
+
+  const handleConnect = (platformName: string) => {
+    toast({
+      title: "Integration Started",
+      description: `Connecting to ${platformName}. You'll be redirected to authenticate.`,
+    });
+  };
+
+  const handleDisconnect = (platformName: string) => {
+    toast({
+      title: "Platform Disconnected",
+      description: `${platformName} has been disconnected successfully.`,
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+      {/* Header */}
+      <header className="border-b border-white/10 bg-white/5 backdrop-blur-sm">
+        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Link to="/">
+              <Button variant="ghost" className="text-white hover:bg-white/10">
+                <Home className="w-4 h-4 mr-2" />
+                Dashboard
+              </Button>
+            </Link>
+            <div className="w-px h-6 bg-white/20"></div>
+            <div className="flex items-center space-x-2">
+              <Settings className="w-5 h-5 text-blue-400" />
+              <h1 className="text-xl font-bold text-white">Admin Portal</h1>
+            </div>
+          </div>
+          <Badge className="bg-blue-600 hover:bg-blue-600">
+            {platforms.filter(p => p.status === "connected").length} / {platforms.length} Connected
+          </Badge>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-6 py-8">
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-white mb-2">Platform Integrations</h2>
+          <p className="text-blue-200">Manage connections to your smart home platforms and devices.</p>
+        </div>
+
+        {/* Platform Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {platforms.map((platform, index) => (
+            <Card key={index} className="bg-white/10 backdrop-blur-sm border-white/20 hover:bg-white/15 transition-all duration-300">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-white text-lg flex items-center">
+                    {getStatusIcon(platform.status)}
+                    <span className="ml-2">{platform.name}</span>
+                  </CardTitle>
+                  <Badge className={getStatusColor(platform.status)}>
+                    {platform.status}
+                  </Badge>
+                </div>
+                <CardDescription className="text-blue-200">
+                  {platform.description}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-blue-300">Auth Type:</span>
+                    <Badge variant="secondary" className="text-xs">
+                      {platform.authType}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-blue-300">Last Sync:</span>
+                    <span className="text-white">{platform.lastSync}</span>
+                  </div>
+                  <div className="flex space-x-2 pt-2">
+                    {platform.status === "connected" ? (
+                      <>
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="flex-1 border-white/20 text-white hover:bg-white/10"
+                          onClick={() => handleDisconnect(platform.name)}
+                        >
+                          Disconnect
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          className="flex-1 bg-blue-600 hover:bg-blue-700"
+                        >
+                          <Settings className="w-3 h-3 mr-1" />
+                          Configure
+                        </Button>
+                      </>
+                    ) : (
+                      <Button 
+                        size="sm" 
+                        className="w-full bg-green-600 hover:bg-green-700"
+                        onClick={() => handleConnect(platform.name)}
+                      >
+                        <LinkIcon className="w-3 h-3 mr-1" />
+                        Connect
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Manual Configuration Section */}
+        <Card className="mt-8 bg-white/10 backdrop-blur-sm border-white/20 text-white">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Key className="w-5 h-5 mr-2 text-yellow-400" />
+              Manual API Configuration
+            </CardTitle>
+            <CardDescription className="text-blue-200">
+              For platforms requiring manual API key setup
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="platform-select" className="text-white">Platform</Label>
+                  <select 
+                    id="platform-select"
+                    className="w-full mt-1 p-2 bg-white/10 border border-white/20 rounded-md text-white"
+                    value={selectedPlatform || ""}
+                    onChange={(e) => setSelectedPlatform(e.target.value)}
+                  >
+                    <option value="">Select a platform</option>
+                    {platforms.filter(p => p.authType === "API Key").map(p => (
+                      <option key={p.name} value={p.name}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="api-key" className="text-white">API Key</Label>
+                  <Input 
+                    id="api-key"
+                    type="password"
+                    placeholder="Enter your API key"
+                    className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="base-url" className="text-white">Base URL (Optional)</Label>
+                  <Input 
+                    id="base-url"
+                    placeholder="https://api.example.com"
+                    className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
+                  />
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="p-4 bg-white/5 rounded-lg">
+                  <h4 className="font-medium text-white mb-2 flex items-center">
+                    <Shield className="w-4 h-4 mr-2 text-green-400" />
+                    Security Notice
+                  </h4>
+                  <p className="text-sm text-blue-200">
+                    API keys are encrypted and stored securely. They are only used to communicate with your devices and are never shared with third parties.
+                  </p>
+                </div>
+                <Button className="w-full bg-blue-600 hover:bg-blue-700">
+                  <Key className="w-4 h-4 mr-2" />
+                  Save Configuration
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </main>
+    </div>
+  );
+};
+
+export default Admin;
