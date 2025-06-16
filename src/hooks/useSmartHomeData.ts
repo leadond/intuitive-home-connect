@@ -164,6 +164,43 @@ export const useSmartHomeData = () => {
     await fetchDevices();
   };
 
+  const controlDevice = async (deviceId: string, command: string, value: any) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await supabase.functions.invoke('control-smartthings-device', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: {
+          deviceId,
+          command,
+          value
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to control device');
+      }
+
+      // Refresh devices after control
+      await fetchDevices();
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error controlling device:', error);
+      toast({
+        title: "Control Failed",
+        description: error.message || "Failed to control device",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   const logActivity = async (deviceId: string, action: string, details?: any) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
@@ -227,6 +264,7 @@ export const useSmartHomeData = () => {
     fetchAllData,
     addPlatform,
     updateDeviceStatus,
+    controlDevice,
     logActivity,
     syncSmartThingsDevices
   };

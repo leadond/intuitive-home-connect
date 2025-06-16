@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -147,7 +146,6 @@ export const DeviceQuickActions = () => {
     setControllingDevices(prev => new Set(prev).add(deviceId));
     
     try {
-      let newStatus = { ...device.status };
       const deviceType = device.device_type.toLowerCase();
       
       switch (deviceType) {
@@ -156,38 +154,37 @@ export const DeviceQuickActions = () => {
         case 'switch':
         case 'dimmer':
           const currentState = device.status?.switch || device.status?.state;
-          newStatus.switch = currentState === 'on' ? 'off' : 'on';
-          if (newStatus.state) {
-            newStatus.state = newStatus.switch;
-          }
+          const newSwitchState = currentState === 'on' ? 'off' : 'on';
+          await controlDevice(device.id, 'switch', newSwitchState);
           break;
         case 'lock':
           const currentLock = device.status?.lock || (device.status?.locked ? 'locked' : 'unlocked');
-          newStatus.lock = currentLock === 'locked' ? 'unlocked' : 'locked';
-          newStatus.locked = newStatus.lock === 'locked';
+          const newLockState = currentLock === 'locked' ? 'unlocked' : 'locked';
+          await controlDevice(device.id, 'lock', newLockState);
           break;
         case 'camera':
+          // For cameras, we'll still use the local status update since most cameras don't support direct recording control
+          let newStatus = { ...device.status };
           newStatus.recording = !device.status?.recording;
+          await updateDeviceStatus(device.id, newStatus);
           break;
         case 'speaker':
         case 'audio':
           const currentSwitch = device.status?.switch || device.status?.state;
-          newStatus.switch = currentSwitch === 'on' ? 'off' : 'on';
+          const newAudioState = currentSwitch === 'on' ? 'off' : 'on';
+          await controlDevice(device.id, 'switch', newAudioState);
           break;
         default:
           const currentDefault = device.status?.switch || device.status?.state;
-          newStatus.switch = currentDefault === 'on' ? 'off' : 'on';
-          if (newStatus.state) {
-            newStatus.state = newStatus.switch;
-          }
+          const newDefaultState = currentDefault === 'on' ? 'off' : 'on';
+          await controlDevice(device.id, 'switch', newDefaultState);
       }
 
-      await updateDeviceStatus(device.id, newStatus);
-      await logActivity(device.id, `${device.device_name} toggled to ${getStatusText(newStatus, device.device_type)}`);
+      await logActivity(device.id, `${device.device_name} toggled`);
       
       toast({
         title: "Device Updated",
-        description: `${device.device_name} is now ${getStatusText(newStatus, device.device_type)}`,
+        description: `${device.device_name} command sent successfully`,
       });
     } catch (error) {
       console.error('Error toggling device:', error);
@@ -210,13 +207,7 @@ export const DeviceQuickActions = () => {
     setControllingDevices(prev => new Set(prev).add(deviceId));
     
     try {
-      const newStatus = { 
-        ...device.status, 
-        level: level[0],
-        switch: level[0] > 0 ? 'on' : 'off'
-      };
-      
-      await updateDeviceStatus(device.id, newStatus);
+      await controlDevice(device.id, 'switchLevel', level[0]);
       await logActivity(device.id, `${device.device_name} brightness set to ${level[0]}%`);
     } catch (error) {
       console.error('Error updating device level:', error);
