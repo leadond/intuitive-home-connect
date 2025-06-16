@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -153,9 +154,9 @@ export const useSmartHomeData = () => {
 
   const removePlatform = async (platformId: string) => {
     try {
-      console.log(`Starting removal of platform ${platformId}...`);
+      console.log(`Starting complete removal of platform ${platformId}...`);
       
-      // Get ALL devices for this platform
+      // Get ALL devices for this platform first
       const { data: devices, error: devicesError } = await supabase
         .from('smart_home_devices')
         .select('id')
@@ -164,47 +165,53 @@ export const useSmartHomeData = () => {
       if (devicesError) throw devicesError;
 
       const deviceIds = devices?.map(device => device.id) || [];
-      console.log(`Found ${deviceIds.length} devices to remove`);
+      console.log(`Found ${deviceIds.length} devices to completely remove`);
 
+      // Step 1: Force delete ALL activity logs for these devices
       if (deviceIds.length > 0) {
-        // Delete ALL activity logs first
+        console.log('Force deleting ALL activity logs for device IDs:', deviceIds);
         const { error: logsError } = await supabase
           .from('device_activity_logs')
           .delete()
           .in('device_id', deviceIds);
 
         if (logsError) {
-          console.error('Error deleting activity logs:', logsError);
+          console.error('Error force deleting activity logs:', logsError);
           throw logsError;
         }
-        console.log('Activity logs removed');
+        console.log('All activity logs force deleted');
+      }
 
-        // Delete ALL energy usage data
+      // Step 2: Force delete ALL energy usage data for these devices
+      if (deviceIds.length > 0) {
+        console.log('Force deleting ALL energy usage for device IDs:', deviceIds);
         const { error: energyError } = await supabase
           .from('energy_usage')
           .delete()
           .in('device_id', deviceIds);
 
         if (energyError) {
-          console.error('Error deleting energy usage:', energyError);
+          console.error('Error force deleting energy usage:', energyError);
           throw energyError;
         }
-        console.log('Energy usage data removed');
-
-        // Delete ALL devices
-        const { error: deleteDevicesError } = await supabase
-          .from('smart_home_devices')
-          .delete()
-          .eq('platform_id', platformId);
-
-        if (deleteDevicesError) {
-          console.error('Error deleting devices:', deleteDevicesError);
-          throw deleteDevicesError;
-        }
-        console.log('Devices removed');
+        console.log('All energy usage data force deleted');
       }
 
-      // Finally delete the platform
+      // Step 3: Force delete ALL devices for this platform
+      console.log('Force deleting ALL devices for platform:', platformId);
+      const { error: deleteDevicesError } = await supabase
+        .from('smart_home_devices')
+        .delete()
+        .eq('platform_id', platformId);
+
+      if (deleteDevicesError) {
+        console.error('Error force deleting devices:', deleteDevicesError);
+        throw deleteDevicesError;
+      }
+      console.log('All devices force deleted');
+
+      // Step 4: Finally delete the platform
+      console.log('Deleting platform:', platformId);
       const { error: deletePlatformError } = await supabase
         .from('smart_home_platforms')
         .delete()
@@ -214,7 +221,7 @@ export const useSmartHomeData = () => {
         console.error('Error deleting platform:', deletePlatformError);
         throw deletePlatformError;
       }
-      console.log('Platform removed');
+      console.log('Platform successfully deleted');
 
       await fetchAllData();
       
