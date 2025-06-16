@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -244,7 +245,37 @@ export const useSmartHomeData = () => {
 
       console.log(`=== Starting complete disconnect for platform: ${platformName} ===`);
       
-      // Step 1: Force delete ALL SmartThings platforms regardless of connection
+      // Step 1: First get all platform IDs for this platform name and user
+      const { data: platformsToDelete, error: fetchError } = await supabase
+        .from('smart_home_platforms')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('platform_name', platformName);
+
+      if (fetchError) {
+        console.error('Error fetching platforms:', fetchError);
+        throw fetchError;
+      }
+
+      const platformIds = platformsToDelete?.map(p => p.id) || [];
+      console.log(`Found ${platformIds.length} platforms to delete:`, platformIds);
+
+      // Step 2: Delete ALL devices associated with these platforms first
+      if (platformIds.length > 0) {
+        const { error: devicesError } = await supabase
+          .from('smart_home_devices')
+          .delete()
+          .eq('user_id', user.id)
+          .in('platform_id', platformIds);
+
+        if (devicesError) {
+          console.error('Error deleting devices:', devicesError);
+          throw devicesError;
+        }
+        console.log('Successfully deleted all devices for platforms');
+      }
+
+      // Step 3: Now delete all platforms for this user and platform name
       const { error: deleteError } = await supabase
         .from('smart_home_platforms')
         .delete()
@@ -256,28 +287,22 @@ export const useSmartHomeData = () => {
         throw deleteError;
       }
 
-      // Step 2: Force delete ALL devices for SmartThings platforms
-      const { error: devicesError } = await supabase
-        .from('smart_home_devices')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (devicesError) {
-        console.error('Error deleting devices:', devicesError);
-      }
-
       console.log(`Successfully force-deleted all ${platformName} data`);
       
-      // Step 3: Immediately clear local state
+      // Step 4: Immediately clear local state
       setPlatforms(prevPlatforms => {
         const filtered = prevPlatforms.filter(p => p.platform_name !== platformName);
         console.log('Platforms after immediate filter:', filtered);
         return filtered;
       });
       
-      setDevices([]);  // Clear all devices for fresh start
+      setDevices(prevDevices => {
+        const filtered = prevDevices.filter(d => d.platform_name !== platformName);
+        console.log('Devices after filter:', filtered);
+        return filtered;
+      });
       
-      // Step 4: Force refresh from database
+      // Step 5: Force refresh from database to ensure consistency
       await fetchAllData();
       
       toast({
