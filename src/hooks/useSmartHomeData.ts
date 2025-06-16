@@ -242,21 +242,31 @@ export const useSmartHomeData = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // First, delete all devices associated with platforms of this name
-      const { error: devicesError } = await supabase
-        .from('smart_home_devices')
-        .delete()
+      // First, get all platform IDs for this platform name and user
+      const { data: platformIds, error: platformIdsError } = await supabase
+        .from('smart_home_platforms')
+        .select('id')
         .eq('user_id', user.id)
-        .in('platform_id', 
-          supabase
-            .from('smart_home_platforms')
-            .select('id')
-            .eq('user_id', user.id)
-            .eq('platform_name', platformName)
-        );
+        .eq('platform_name', platformName);
 
-      if (devicesError) {
-        console.error('Error deleting devices:', devicesError);
+      if (platformIdsError) {
+        console.error('Error fetching platform IDs:', platformIdsError);
+        throw platformIdsError;
+      }
+
+      const platformIdArray = platformIds?.map(p => p.id) || [];
+
+      // Delete all devices associated with these platforms
+      if (platformIdArray.length > 0) {
+        const { error: devicesError } = await supabase
+          .from('smart_home_devices')
+          .delete()
+          .eq('user_id', user.id)
+          .in('platform_id', platformIdArray);
+
+        if (devicesError) {
+          console.error('Error deleting devices:', devicesError);
+        }
       }
 
       // Then delete all platforms with this name for the user
