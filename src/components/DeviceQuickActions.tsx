@@ -215,6 +215,25 @@ const getStatusText = (deviceStatus: any, deviceType: string): string => {
   return 'Unknown';
 };
 
+// Utility function to get status color for badges
+const getStatusColor = (deviceStatus: any, deviceType: string): string => {
+  if (deviceType === 'thermostat') {
+    const mode = deviceStatus.thermostatMode || 'off';
+    if (mode === 'heat') return 'bg-orange-600 hover:bg-orange-700';
+    if (mode === 'cool') return 'bg-blue-600 hover:bg-blue-700';
+    if (mode === 'auto') return 'bg-green-600 hover:bg-green-700';
+    return 'bg-gray-600 hover:bg-gray-700';
+  }
+  
+  if (deviceStatus.state === 'on') {
+    return 'bg-green-600 hover:bg-green-700';
+  }
+  if (deviceStatus.state === 'off') {
+    return 'bg-gray-600 hover:bg-gray-700';
+  }
+  return 'bg-yellow-600 hover:bg-yellow-700';
+};
+
 export const DeviceQuickActions = () => {
   const { devices, isLoading, updateDeviceStatus, logActivity } = useSmartHomeData();
   const { fetchLiveDeviceStatus, sendDeviceCommand, isUpdating } = useSmartThingsStatus();
