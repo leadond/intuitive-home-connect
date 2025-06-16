@@ -56,6 +56,9 @@ export const CameraView = ({
     night_vision_commands?: Record<string, string>;
   };
 
+  // For ReoLink cameras, assume they're online if they have an IP address
+  const isOnline = deviceStatus.online !== false && !!deviceStatus.ip_address;
+
   const handlePtzCommand = async (command: string) => {
     try {
       await onPtzCommand(device, command);
@@ -138,8 +141,8 @@ export const CameraView = ({
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <Badge className={deviceStatus.online ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}>
-              {deviceStatus.online ? 'Live' : 'Offline'}
+            <Badge className={isOnline ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}>
+              {isOnline ? 'Live' : 'Offline'}
             </Badge>
             <Button
               size="sm"
@@ -156,7 +159,7 @@ export const CameraView = ({
       <CardContent className="space-y-4">
         {/* Live Video Feed */}
         <div className="relative aspect-video bg-black rounded-lg overflow-hidden border border-white/20">
-          {deviceStatus.online && deviceStatus.http_snapshot ? (
+          {isOnline && deviceStatus.http_snapshot ? (
             <>
               <img
                 src={deviceStatus.http_snapshot}
@@ -204,6 +207,7 @@ export const CameraView = ({
             variant="outline" 
             className="text-white border-white/20 hover:bg-white/10"
             onClick={openStreamUrl}
+            disabled={!deviceStatus.rtsp_main}
           >
             <Eye className="w-4 h-4 mr-2" />
             Open Stream
@@ -213,6 +217,7 @@ export const CameraView = ({
             variant="outline" 
             className="text-white border-white/20 hover:bg-white/10"
             onClick={openSnapshotUrl}
+            disabled={!deviceStatus.http_snapshot}
           >
             <ImageIcon className="w-4 h-4 mr-2" />
             Snapshot
@@ -223,134 +228,141 @@ export const CameraView = ({
         {showControls && (
           <div className="space-y-4 border-t border-white/10 pt-4">
             {/* PTZ Controls */}
-            <div className="space-y-3">
-              <h4 className="text-sm font-medium text-blue-200">PTZ Controls</h4>
-              
-              {/* Directional Controls */}
-              <div className="grid grid-cols-3 gap-2 max-w-32 mx-auto">
-                <div></div>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="text-white hover:bg-white/20"
-                  onClick={() => handlePtzCommand('tilt_up')}
-                  disabled={isUpdating}
-                >
-                  <ArrowUp className="w-4 h-4" />
-                </Button>
-                <div></div>
+            {capabilities.ptz_commands && (
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-blue-200">PTZ Controls</h4>
                 
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="text-white hover:bg-white/20"
-                  onClick={() => handlePtzCommand('pan_left')}
-                  disabled={isUpdating}
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="text-white hover:bg-white/20"
-                  onClick={() => handlePtzCommand('stop')}
-                  disabled={isUpdating}
-                >
-                  <Square className="w-4 h-4" />
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="text-white hover:bg-white/20"
-                  onClick={() => handlePtzCommand('pan_right')}
-                  disabled={isUpdating}
-                >
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
+                {/* Directional Controls */}
+                <div className="grid grid-cols-3 gap-2 max-w-32 mx-auto">
+                  <div></div>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="text-white hover:bg-white/20"
+                    onClick={() => handlePtzCommand('tilt_up')}
+                    disabled={isUpdating || !isOnline}
+                  >
+                    <ArrowUp className="w-4 h-4" />
+                  </Button>
+                  <div></div>
+                  
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="text-white hover:bg-white/20"
+                    onClick={() => handlePtzCommand('pan_left')}
+                    disabled={isUpdating || !isOnline}
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="text-white hover:bg-white/20"
+                    onClick={() => handlePtzCommand('stop')}
+                    disabled={isUpdating || !isOnline}
+                  >
+                    <Square className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="text-white hover:bg-white/20"
+                    onClick={() => handlePtzCommand('pan_right')}
+                    disabled={isUpdating || !isOnline}
+                  >
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                  
+                  <div></div>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="text-white hover:bg-white/20"
+                    onClick={() => handlePtzCommand('tilt_down')}
+                    disabled={isUpdating || !isOnline}
+                  >
+                    <ArrowDown className="w-4 h-4" />
+                  </Button>
+                  <div></div>
+                </div>
                 
-                <div></div>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="text-white hover:bg-white/20"
-                  onClick={() => handlePtzCommand('tilt_down')}
-                  disabled={isUpdating}
-                >
-                  <ArrowDown className="w-4 h-4" />
-                </Button>
-                <div></div>
+                {/* Zoom Controls */}
+                <div className="flex justify-center space-x-2">
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="text-white hover:bg-white/20"
+                    onClick={() => handlePtzCommand('zoom_in')}
+                    disabled={isUpdating || !isOnline}
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="text-white hover:bg-white/20"
+                    onClick={() => handlePtzCommand('zoom_out')}
+                    disabled={isUpdating || !isOnline}
+                  >
+                    <ZoomOut className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
-              
-              {/* Zoom Controls */}
-              <div className="flex justify-center space-x-2">
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="text-white hover:bg-white/20"
-                  onClick={() => handlePtzCommand('zoom_in')}
-                  disabled={isUpdating}
-                >
-                  <ZoomIn className="w-4 h-4" />
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="text-white hover:bg-white/20"
-                  onClick={() => handlePtzCommand('zoom_out')}
-                  disabled={isUpdating}
-                >
-                  <ZoomOut className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
+            )}
 
             {/* Preset Controls */}
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-blue-200">Preset Positions</h4>
-              <div className="flex items-center space-x-2">
-                <select 
-                  value={selectedPreset} 
-                  onChange={(e) => setSelectedPreset(e.target.value)}
-                  className="bg-white/10 border border-white/20 rounded px-2 py-1 text-white text-sm"
-                >
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
-                    <option key={num} value={num.toString()} className="bg-gray-800">
-                      Preset {num}
-                    </option>
-                  ))}
-                </select>
+            {capabilities.ptz_commands && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-blue-200">Preset Positions</h4>
+                <div className="flex items-center space-x-2">
+                  <select 
+                    value={selectedPreset} 
+                    onChange={(e) => setSelectedPreset(e.target.value)}
+                    className="bg-white/10 border border-white/20 rounded px-2 py-1 text-white text-sm"
+                    disabled={!isOnline}
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
+                      <option key={num} value={num.toString()} className="bg-gray-800">
+                        Preset {num}
+                      </option>
+                    ))}
+                  </select>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="text-white hover:bg-white/20"
+                    onClick={handlePresetGoto}
+                    disabled={isUpdating || !isOnline}
+                  >
+                    Go To
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Night Vision Control */}
+            {capabilities.night_vision_commands && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-blue-200">Night Vision</h4>
                 <Button 
                   size="sm" 
                   variant="ghost" 
-                  className="text-white hover:bg-white/20"
-                  onClick={handlePresetGoto}
-                  disabled={isUpdating}
+                  className="w-full text-white hover:bg-white/20 justify-start"
+                  onClick={handleNightVisionToggle}
+                  disabled={isUpdating || !isOnline}
                 >
-                  Go To
+                  {deviceStatus.night_vision === 'on' ? (
+                    <Moon className="w-4 h-4 mr-2" />
+                  ) : deviceStatus.night_vision === 'off' ? (
+                    <Sun className="w-4 h-4 mr-2" />
+                  ) : (
+                    <Eye className="w-4 h-4 mr-2" />
+                  )}
+                  {deviceStatus.night_vision === 'on' ? 'On' : deviceStatus.night_vision === 'off' ? 'Off' : 'Auto'}
                 </Button>
               </div>
-            </div>
-
-            {/* Night Vision Control */}
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-blue-200">Night Vision</h4>
-              <Button 
-                size="sm" 
-                variant="ghost" 
-                className="w-full text-white hover:bg-white/20 justify-start"
-                onClick={handleNightVisionToggle}
-                disabled={isUpdating}
-              >
-                {deviceStatus.night_vision === 'on' ? (
-                  <Moon className="w-4 h-4 mr-2" />
-                ) : deviceStatus.night_vision === 'off' ? (
-                  <Sun className="w-4 h-4 mr-2" />
-                ) : (
-                  <Eye className="w-4 h-4 mr-2" />
-                )}
-                {deviceStatus.night_vision === 'on' ? 'On' : deviceStatus.night_vision === 'off' ? 'Off' : 'Auto'}
-              </Button>
-            </div>
+            )}
 
             {/* Status Information */}
             <div className="space-y-1 text-xs text-blue-300">
@@ -358,6 +370,12 @@ export const CameraView = ({
                 <span>Position:</span>
                 <span>
                   P: {deviceStatus.ptz_position?.pan || 0}° T: {deviceStatus.ptz_position?.tilt || 0}° Z: {deviceStatus.ptz_position?.zoom || 1}x
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Status:</span>
+                <span className={isOnline ? 'text-green-400' : 'text-red-400'}>
+                  {isOnline ? 'Online' : 'Offline'}
                 </span>
               </div>
             </div>

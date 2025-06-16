@@ -942,6 +942,12 @@ export const DeviceQuickActions = () => {
     const newStatuses: Record<string, any> = {};
     
     for (const device of devices) {
+      // Skip SmartThings API calls for ReoLink cameras - they're not SmartThings devices
+      if (device.platform_name === 'ReoLink' || device.device_id.startsWith('reolink_')) {
+        console.log(`Skipping SmartThings API call for ReoLink device: ${device.device_name}`);
+        continue;
+      }
+      
       const liveStatus = await fetchLiveDeviceStatus(device.device_id);
       if (liveStatus) {
         newStatuses[device.device_id] = liveStatus;
