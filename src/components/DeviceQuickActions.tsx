@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +34,8 @@ const getDeviceTypeFromCapabilities = (capabilities: any, deviceType: string, de
       Object.keys(comp).some(key => key.toLowerCase().includes(capName.toLowerCase()))
     );
 
+  // Check for fan speed capability first
+  if (hasCapability('fanSpeed') || hasCapability('speed')) return 'fan';
   if (hasCapability('switchLevel') || hasCapability('level')) return 'dimmer';
   if (hasCapability('thermostat')) return 'thermostat';
   if (hasCapability('lock')) return 'lock';
@@ -65,6 +66,7 @@ const getDeviceIcon = (deviceType: string, deviceName: string) => {
 const getDeviceStatus = (device: SmartHomeDevice, deviceType: string, liveStatus?: any) => {
   let state = 'unknown';
   let level = 0;
+  let fanSpeed = 0;
 
   // First, try to get status from live data if available
   if (liveStatus && liveStatus.components && liveStatus.components.main) {
@@ -78,6 +80,11 @@ const getDeviceStatus = (device: SmartHomeDevice, deviceType: string, liveStatus
     // Check for level (dimmer)
     if (mainComponent.switchLevel && mainComponent.switchLevel.level && mainComponent.switchLevel.level.value !== undefined) {
       level = mainComponent.switchLevel.level.value;
+    }
+    
+    // Check for fan speed
+    if (mainComponent.fanSpeed && mainComponent.fanSpeed.speed && mainComponent.fanSpeed.speed.value !== undefined) {
+      fanSpeed = mainComponent.fanSpeed.speed.value;
     }
   }
   
@@ -93,11 +100,15 @@ const getDeviceStatus = (device: SmartHomeDevice, deviceType: string, liveStatus
         if (component.switchLevel && component.switchLevel.level) {
           level = component.switchLevel.level.value || 0;
         }
+        // Check for fan speed
+        if (component.fanSpeed && component.fanSpeed.speed) {
+          fanSpeed = component.fanSpeed.speed.value || 0;
+        }
       }
     }
   }
   
-  return { state, level };
+  return { state, level, fanSpeed };
 };
 
 // Utility function to get status color based on device state
@@ -112,6 +123,9 @@ const getStatusText = (deviceStatus: any, deviceType: string): string => {
   if (deviceStatus.state === 'on') {
     if (deviceType === 'dimmer' && deviceStatus.level > 0) {
       return `ON (${deviceStatus.level}%)`;
+    }
+    if (deviceType === 'fan' && deviceStatus.fanSpeed > 0) {
+      return `ON (Speed ${deviceStatus.fanSpeed})`;
     }
     return 'ON';
   }
@@ -184,6 +198,25 @@ export const DeviceQuickActions = () => {
       setTimeout(() => refreshLiveStatuses(), 1000);
     } catch (error) {
       console.error('Error changing dimmer level:', error);
+    }
+  };
+
+  // Handler function for fan speed changes
+  const handleFanSpeedChange = async (device: SmartHomeDevice, value: number[]) => {
+    try {
+      const speed = value[0];
+      await sendDeviceCommand(device.device_id, 'fanSpeed', 'setSpeed', [speed]);
+      await logActivity(device.id, `Set fan speed to ${speed}`, { speed });
+      
+      toast({
+        title: "Fan Speed Updated",
+        description: `${device.device_name} set to speed ${speed}`,
+      });
+      
+      // Refresh status after a short delay
+      setTimeout(() => refreshLiveStatuses(), 1000);
+    } catch (error) {
+      console.error('Error changing fan speed:', error);
     }
   };
 
@@ -282,9 +315,11 @@ export const DeviceQuickActions = () => {
                     const liveStatus = liveStatuses[device.device_id];
                     const deviceStatus = getDeviceStatus(device, deviceType, liveStatus);
                     const isDimmer = deviceType === 'dimmer';
+                    const isFan = deviceType === 'fan';
                     const currentLevel = deviceStatus.level || 0;
+                    const currentFanSpeed = deviceStatus.fanSpeed || 0;
                     
-                    console.log(`Rendering device ${device.device_name}:`, { deviceType, deviceStatus, currentLevel, liveStatus });
+                    console.log(`Rendering device ${device.device_name}:`, { deviceType, deviceStatus, currentLevel, currentFanSpeed, liveStatus });
                     
                     return (
                       <div 
@@ -319,22 +354,47 @@ export const DeviceQuickActions = () => {
                               />
                               <span className="text-sm text-blue-200">Power</span>
                             </div>
-                            {deviceStatus.state === 'on' && (
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-sm text-blue-200">Brightness</span>
-                                  <span className="text-sm text-white">{currentLevel}%</span>
-                                </div>
-                                <Slider
-                                  value={[currentLevel]}
-                                  onValueChange={(value) => handleDimmerChange(device, value)}
-                                  max={100}
-                                  step={1}
-                                  disabled={isUpdating}
-                                  className="w-full"
-                                />
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-blue-200">Brightness</span>
+                                <span className="text-sm text-white">{currentLevel}%</span>
                               </div>
-                            )}
+                              <Slider
+                                value={[currentLevel]}
+                                onValueChange={(value) => handleDimmerChange(device, value)}
+                                max={100}
+                                step={1}
+                                disabled={isUpdating}
+                                className="w-full"
+                              />
+                            </div>
+                          </div>
+                        ) : isFan ? (
+                          <div className="space-y-3">
+                            <div className="flex items-center space-x-3">
+                              <Switch
+                                checked={deviceStatus.state === 'on'}
+                                onCheckedChange={() => handleToggleDevice(device)}
+                                disabled={isUpdating}
+                                className="data-[state=checked]:bg-blue-600"
+                              />
+                              <span className="text-sm text-blue-200">Power</span>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-blue-200">Speed</span>
+                                <span className="text-sm text-white">{currentFanSpeed}</span>
+                              </div>
+                              <Slider
+                                value={[currentFanSpeed]}
+                                onValueChange={(value) => handleFanSpeedChange(device, value)}
+                                max={4}
+                                min={0}
+                                step={1}
+                                disabled={isUpdating}
+                                className="w-full"
+                              />
+                            </div>
                           </div>
                         ) : (
                           <div className="flex justify-center">
