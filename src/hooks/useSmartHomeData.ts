@@ -155,7 +155,7 @@ export const useSmartHomeData = () => {
     try {
       console.log(`Starting removal of platform ${platformId}...`);
       
-      // Get devices for this platform
+      // Get ALL devices for this platform
       const { data: devices, error: devicesError } = await supabase
         .from('smart_home_devices')
         .select('id')
@@ -163,34 +163,44 @@ export const useSmartHomeData = () => {
 
       if (devicesError) throw devicesError;
 
-      if (devices && devices.length > 0) {
-        const deviceIds = devices.map(device => device.id);
+      const deviceIds = devices?.map(device => device.id) || [];
+      console.log(`Found ${deviceIds.length} devices to remove`);
 
-        // Delete activity logs first
+      if (deviceIds.length > 0) {
+        // Delete ALL activity logs first
         const { error: logsError } = await supabase
           .from('device_activity_logs')
           .delete()
           .in('device_id', deviceIds);
 
-        if (logsError) throw logsError;
+        if (logsError) {
+          console.error('Error deleting activity logs:', logsError);
+          throw logsError;
+        }
         console.log('Activity logs removed');
 
-        // Delete energy usage data
+        // Delete ALL energy usage data
         const { error: energyError } = await supabase
           .from('energy_usage')
           .delete()
           .in('device_id', deviceIds);
 
-        if (energyError) throw energyError;
+        if (energyError) {
+          console.error('Error deleting energy usage:', energyError);
+          throw energyError;
+        }
         console.log('Energy usage data removed');
 
-        // Delete devices
+        // Delete ALL devices
         const { error: deleteDevicesError } = await supabase
           .from('smart_home_devices')
           .delete()
           .eq('platform_id', platformId);
 
-        if (deleteDevicesError) throw deleteDevicesError;
+        if (deleteDevicesError) {
+          console.error('Error deleting devices:', deleteDevicesError);
+          throw deleteDevicesError;
+        }
         console.log('Devices removed');
       }
 
@@ -200,7 +210,10 @@ export const useSmartHomeData = () => {
         .delete()
         .eq('id', platformId);
 
-      if (deletePlatformError) throw deletePlatformError;
+      if (deletePlatformError) {
+        console.error('Error deleting platform:', deletePlatformError);
+        throw deletePlatformError;
+      }
       console.log('Platform removed');
 
       await fetchAllData();
