@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Settings, 
   Home, 
@@ -30,6 +31,7 @@ const Admin = () => {
   const [baseUrl, setBaseUrl] = useState("");
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
+  const [yamlConfig, setYamlConfig] = useState("");
 
   // Available platforms that users can connect to
   const availablePlatforms = [
@@ -51,7 +53,7 @@ const Admin = () => {
     { name: "TCC Honeywell", description: "Total Connect Comfort", authType: "OAuth" },
     { name: "Eufy", description: "Security and cleaning devices", authType: "API Key" },
     { name: "HomeWerk", description: "Home automation platform", authType: "API Key" },
-    { name: "Konnected", description: "Wired security panel", authType: "API Key" },
+    { name: "Konnected", description: "Wired security panel", authType: "YAML" },
     { name: "YoLink", description: "LoRa smart home devices", authType: "API Key" },
     { name: "Yardian", description: "Smart sprinkler system", authType: "OAuth" }
   ];
@@ -97,6 +99,11 @@ const Admin = () => {
       toast({
         title: "HomeKit Configuration",
         description: `${platformName} requires HomeKit pairing. Please enter your pairing code below.`,
+      });
+    } else if (authType === "YAML") {
+      toast({
+        title: "YAML Configuration",
+        description: `Please enter your ${platformName} YAML configuration below.`,
       });
     } else {
       toast({
@@ -160,6 +167,18 @@ const Admin = () => {
       credentials = {
         pairing_code: apiKey
       };
+    } else if (platform.authType === "YAML") {
+      if (!yamlConfig) {
+        toast({
+          title: "Missing YAML Configuration",
+          description: "Please enter the YAML configuration.",
+          variant: "destructive"
+        });
+        return;
+      }
+      credentials = {
+        yaml_config: yamlConfig
+      };
     }
 
     try {
@@ -181,6 +200,7 @@ const Admin = () => {
       setBaseUrl("");
       setClientId("");
       setClientSecret("");
+      setYamlConfig("");
     } catch (error) {
       console.error('Error connecting platform:', error);
       toast({
@@ -409,6 +429,19 @@ const Admin = () => {
                       className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                {selectedPlatformData?.authType === "YAML" && (
+                  <div>
+                    <Label htmlFor="yaml-config" className="text-white">YAML Configuration</Label>
+                    <Textarea 
+                      id="yaml-config"
+                      placeholder="Enter your YAML configuration here..."
+                      className="bg-white/10 border-white/20 text-white placeholder:text-blue-300 min-h-[120px]"
+                      value={yamlConfig}
+                      onChange={(e) => setYamlConfig(e.target.value)}
                     />
                   </div>
                 )}
