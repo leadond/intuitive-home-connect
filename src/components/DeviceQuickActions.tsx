@@ -374,7 +374,7 @@ export const DeviceQuickActions = () => {
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center space-x-3">
                             <div className="p-3 rounded-lg bg-white/10">
-                              <DeviceIcon className="w-7 h-7 text-blue-400" />
+                              <DeviceIcon className="w-8 h-8 text-blue-400" />
                             </div>
                             <div>
                               <p className="font-medium text-sm">{device.device_name}</p>
