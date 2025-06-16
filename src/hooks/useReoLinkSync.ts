@@ -46,45 +46,16 @@ export const useReoLinkSync = () => {
 
       console.log(`Attempting to connect to ReoLink camera at: ${cameraIp}:${port}`);
 
-      // Since we can't directly implement the ReoLink API in a browser environment,
-      // we'll simulate device discovery and provide configuration guidance
-      const deviceMessage = `
-ReoLink Camera Setup:
-
-Camera IP: ${cameraIp}
-Port: ${port}
-Username: ${username}
-Password: ${password ? 'configured' : 'not set'}
-
-Available Features:
-- Live streaming via RTSP
-- Motion detection
-- PTZ controls (if supported)
-- Recording management
-- Snapshot capture
-
-RTSP Stream URLs:
-- Main Stream: rtsp://${username}:${password}@${cameraIp}:554/h264Preview_01_main
-- Sub Stream: rtsp://${username}:${password}@${cameraIp}:554/h264Preview_01_sub
-
-API Endpoints:
-- Device Info: http://${cameraIp}/api.cgi?cmd=GetDevInfo
-- Live Stream: http://${cameraIp}/cgi-bin/api.cgi?cmd=Snap&channel=0
-- Motion Detection: http://${cameraIp}/cgi-bin/api.cgi?cmd=GetMdState&channel=0
-
-Note: Due to browser security restrictions, direct camera API calls require CORS configuration or server-side implementation.
-`;
-
-      // Create camera device entries
+      // Create camera view devices
       const devicesToStore = [];
 
-      // Main camera device
+      // Main camera view device
       devicesToStore.push({
         user_id: user.id,
         platform_id: platforms.id,
-        device_id: `reolink_${cameraIp.replace(/\./g, '_')}`,
-        device_name: `ReoLink Camera (${cameraIp})`,
-        device_type: 'camera',
+        device_id: `reolink_camera_${cameraIp.replace(/\./g, '_')}`,
+        device_name: `ReoLink Camera View (${cameraIp})`,
+        device_type: 'camera_view',
         room: 'Security',
         status: {
           ip_address: cameraIp,
@@ -95,25 +66,44 @@ Note: Due to browser security restrictions, direct camera API calls require CORS
           connection_type: 'TCP/IP',
           rtsp_main: `rtsp://${username}:${password}@${cameraIp}:554/h264Preview_01_main`,
           rtsp_sub: `rtsp://${username}:${password}@${cameraIp}:554/h264Preview_01_sub`,
-          setup_message: deviceMessage
+          http_snapshot: `http://${cameraIp}/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=wuuPhkmUCeI9WG7C&user=${username}&password=${password}`,
+          ptz_position: { pan: 0, tilt: 0, zoom: 1 },
+          night_vision: 'auto',
+          recording: 'enabled'
         },
         capabilities: {
-          type: 'camera',
+          type: 'camera_view',
           readable: true,
           writable: true,
           supports_streaming: true,
           supports_ptz: true,
           supports_recording: true,
           supports_motion_detection: true,
-          supports_night_vision: true
+          supports_night_vision: true,
+          supports_snapshot: true,
+          ptz_commands: {
+            pan_left: `http://${cameraIp}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=Left&speed=32&user=${username}&password=${password}`,
+            pan_right: `http://${cameraIp}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=Right&speed=32&user=${username}&password=${password}`,
+            tilt_up: `http://${cameraIp}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=Up&speed=32&user=${username}&password=${password}`,
+            tilt_down: `http://${cameraIp}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=Down&speed=32&user=${username}&password=${password}`,
+            zoom_in: `http://${cameraIp}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=ZoomInc&user=${username}&password=${password}`,
+            zoom_out: `http://${cameraIp}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=ZoomDec&user=${username}&password=${password}`,
+            stop: `http://${cameraIp}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=Stop&user=${username}&password=${password}`,
+            preset_goto: `http://${cameraIp}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=ToPos&id={preset_id}&user=${username}&password=${password}`
+          },
+          night_vision_commands: {
+            auto: `http://${cameraIp}/cgi-bin/api.cgi?cmd=SetIrLights&channel=0&value=Auto&user=${username}&password=${password}`,
+            on: `http://${cameraIp}/cgi-bin/api.cgi?cmd=SetIrLights&channel=0&value=On&user=${username}&password=${password}`,
+            off: `http://${cameraIp}/cgi-bin/api.cgi?cmd=SetIrLights&channel=0&value=Off&user=${username}&password=${password}`
+          }
         }
       });
 
-      // Motion sensor entity
+      // Motion detection sensor
       devicesToStore.push({
         user_id: user.id,
         platform_id: platforms.id,
-        device_id: `reolink_${cameraIp.replace(/\./g, '_')}_motion`,
+        device_id: `reolink_motion_${cameraIp.replace(/\./g, '_')}`,
         device_name: `ReoLink Motion Sensor (${cameraIp})`,
         device_type: 'binary_sensor',
         room: 'Security',
@@ -121,59 +111,15 @@ Note: Due to browser security restrictions, direct camera API calls require CORS
           state: 'off',
           device_class: 'motion',
           parent_camera: cameraIp,
-          sensitivity: 'medium'
+          sensitivity: 'medium',
+          last_triggered: null
         },
         capabilities: {
           type: 'binary_sensor',
           readable: true,
           writable: false,
-          device_class: 'motion'
-        }
-      });
-
-      // PTZ control entity (if camera supports it)
-      devicesToStore.push({
-        user_id: user.id,
-        platform_id: platforms.id,
-        device_id: `reolink_${cameraIp.replace(/\./g, '_')}_ptz`,
-        device_name: `ReoLink PTZ Control (${cameraIp})`,
-        device_type: 'switch',
-        room: 'Security',
-        status: {
-          state: 'off',
-          pan: 0,
-          tilt: 0,
-          zoom: 1,
-          parent_camera: cameraIp
-        },
-        capabilities: {
-          type: 'ptz_control',
-          readable: true,
-          writable: true,
-          supports_pan: true,
-          supports_tilt: true,
-          supports_zoom: true
-        }
-      });
-
-      // Night vision switch
-      devicesToStore.push({
-        user_id: user.id,
-        platform_id: platforms.id,
-        device_id: `reolink_${cameraIp.replace(/\./g, '_')}_night_vision`,
-        device_name: `ReoLink Night Vision (${cameraIp})`,
-        device_type: 'switch',
-        room: 'Security',
-        status: {
-          state: 'auto',
-          mode: 'auto',
-          parent_camera: cameraIp
-        },
-        capabilities: {
-          type: 'switch',
-          readable: true,
-          writable: true,
-          device_class: 'night_vision'
+          device_class: 'motion',
+          parent_device: `reolink_camera_${cameraIp.replace(/\./g, '_')}`
         }
       });
 
@@ -200,7 +146,7 @@ Note: Due to browser security restrictions, direct camera API calls require CORS
 
       toast({
         title: "ReoLink Camera Synced",
-        description: `Successfully configured camera at ${cameraIp}. Check device status for streaming URLs and API endpoints.`,
+        description: `Successfully configured camera view at ${cameraIp} with PTZ controls.`,
       });
 
       return devicesToStore;

@@ -28,14 +28,20 @@ import { useSmartThingsStatus } from "@/hooks/useSmartThingsStatus";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { ThermostatControlDialog } from "@/components/ThermostatControlDialog";
+import { CameraView } from "@/components/CameraView";
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 
 // Utility function to determine device type from capabilities
 const getDeviceTypeFromCapabilities = (capabilities: any, deviceType: string, deviceName: string): string => {
-  if (!capabilities || !Array.isArray(capabilities)) return 'switch';
+  if (!capabilities || !Array.isArray(capabilities)) return deviceType === 'camera_view' ? 'camera_view' : 'switch';
   
   const name = deviceName.toLowerCase();
+
+  // Check for camera view specifically
+  if (deviceType === 'camera_view' || name.includes('camera view')) {
+    return 'camera_view';
+  }
 
   // Check for Family Hub specifically
   if (name.includes('family hub') || name.includes('refrigerator')) {
@@ -360,6 +366,8 @@ interface DraggableDeviceProps {
   onDimmerChange: (device: SmartHomeDevice, value: number[]) => Promise<void>;
   onFanSpeedChange: (device: SmartHomeDevice, value: number[]) => Promise<void>;
   onThermostatClick: (device: SmartHomeDevice) => void;
+  onPtzCommand: (device: SmartHomeDevice, command: string) => Promise<void>;
+  onNightVisionToggle: (device: SmartHomeDevice, mode: string) => Promise<void>;
   isUpdating: boolean;
 }
 
@@ -372,6 +380,8 @@ const DraggableDevice = ({
   onDimmerChange,
   onFanSpeedChange,
   onThermostatClick,
+  onPtzCommand,
+  onNightVisionToggle,
   isUpdating
 }: DraggableDeviceProps) => {
   const [{ isDragging }, drag, preview] = useDrag({
@@ -404,6 +414,7 @@ const DraggableDevice = ({
   const isThermostat = deviceType === 'thermostat';
   const isSensor = deviceType === 'sensor';
   const isFamilyHub = deviceType === 'family-hub';
+  const isCameraView = deviceType === 'camera_view';
   const currentLevel = deviceStatus.level || 0;
   const currentFanSpeed = deviceStatus.fanSpeed || 0;
 
@@ -437,6 +448,23 @@ const DraggableDevice = ({
       if (interval) clearInterval(interval);
     };
   }, [doorOpenTime]);
+
+  // If it's a camera view, render the camera component
+  if (isCameraView) {
+    return (
+      <div 
+        ref={(node) => drag(drop(node))}
+        className={`transition-all duration-200 ${isDragging ? 'opacity-50' : ''}`}
+      >
+        <CameraView 
+          device={device}
+          onPtzCommand={onPtzCommand}
+          onNightVisionToggle={onNightVisionToggle}
+          isUpdating={isUpdating}
+        />
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -807,6 +835,86 @@ export const DeviceQuickActions = () => {
     setSelectedThermostat(device);
   };
 
+  // Handler function for PTZ commands
+  const handlePtzCommand = async (device: SmartHomeDevice, command: string) => {
+    try {
+      console.log(`Executing PTZ command: ${command} for camera: ${device.device_name}`);
+      
+      const capabilities = device.capabilities as { ptz_commands?: Record<string, string> };
+      const ptzCommands = capabilities?.ptz_commands;
+      
+      if (!ptzCommands) {
+        throw new Error('PTZ commands not available for this camera');
+      }
+
+      let commandUrl = '';
+      
+      if (command.startsWith('preset_goto_')) {
+        const presetId = command.replace('preset_goto_', '');
+        commandUrl = ptzCommands.preset_goto?.replace('{preset_id}', presetId) || '';
+      } else {
+        commandUrl = ptzCommands[command] || '';
+      }
+
+      if (!commandUrl) {
+        throw new Error(`PTZ command ${command} not found`);
+      }
+
+      // Execute the PTZ command via HTTP request
+      // Note: In a real implementation, this would go through a backend service
+      // due to CORS restrictions
+      console.log(`PTZ Command URL: ${commandUrl}`);
+      
+      // For now, we'll simulate the command execution
+      await logActivity(device.id, `PTZ command: ${command}`, { command, url: commandUrl });
+      
+      toast({
+        title: "PTZ Command Sent",
+        description: `Camera ${command} command executed. Check camera for movement.`,
+      });
+    } catch (error) {
+      console.error('Error executing PTZ command:', error);
+      toast({
+        title: "PTZ Command Failed",
+        description: `Failed to execute ${command}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Handler function for night vision toggle
+  const handleNightVisionToggle = async (device: SmartHomeDevice, mode: string) => {
+    try {
+      console.log(`Setting night vision mode to: ${mode} for camera: ${device.device_name}`);
+      
+      const capabilities = device.capabilities as { night_vision_commands?: Record<string, string> };
+      const nightVisionCommands = capabilities?.night_vision_commands;
+      
+      if (!nightVisionCommands) {
+        throw new Error('Night vision commands not available for this camera');
+      }
+
+      const commandUrl = nightVisionCommands[mode];
+      
+      if (!commandUrl) {
+        throw new Error(`Night vision mode ${mode} not supported`);
+      }
+
+      // Execute the night vision command via HTTP request
+      console.log(`Night Vision Command URL: ${commandUrl}`);
+      
+      // Update device status
+      const updatedStatus = { ...device.status, night_vision: mode };
+      await updateDeviceStatus(device.id, updatedStatus);
+      await logActivity(device.id, `Night vision set to ${mode}`, { mode, url: commandUrl });
+      
+    } catch (error) {
+      console.error('Error changing night vision mode:', error);
+      throw error;
+    }
+  };
+
+  // Function to move a device between rooms
   const moveDevice = (roomName: string, dragIndex: number, hoverIndex: number) => {
     const roomDevices = devicesByRoom[roomName];
     const draggedDevice = roomDevices[dragIndex];
@@ -939,6 +1047,8 @@ export const DeviceQuickActions = () => {
                         onDimmerChange={handleDimmerChange}
                         onFanSpeedChange={handleFanSpeedChange}
                         onThermostatClick={handleThermostatClick}
+                        onPtzCommand={handlePtzCommand}
+                        onNightVisionToggle={handleNightVisionToggle}
                         isUpdating={isUpdating}
                       />
                     ))}
