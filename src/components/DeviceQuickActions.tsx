@@ -19,7 +19,9 @@ import {
   Lamp,
   RefreshCw,
   Activity,
-  GripVertical
+  GripVertical,
+  DoorOpen,
+  Timer
 } from "lucide-react";
 import { useSmartHomeData, SmartHomeDevice } from "@/hooks/useSmartHomeData";
 import { useSmartThingsStatus } from "@/hooks/useSmartThingsStatus";
@@ -34,6 +36,11 @@ const getDeviceTypeFromCapabilities = (capabilities: any, deviceType: string, de
   if (!capabilities || !Array.isArray(capabilities)) return 'switch';
   
   const name = deviceName.toLowerCase();
+
+  // Check for Family Hub specifically
+  if (name.includes('family hub') || name.includes('refrigerator')) {
+    return 'family-hub';
+  }
 
   // Check for sensor capabilities first
   for (const component of capabilities) {
@@ -91,6 +98,7 @@ const getDeviceTypeFromCapabilities = (capabilities: any, deviceType: string, de
 const getDeviceIcon = (deviceType: string, deviceName: string) => {
   const name = deviceName.toLowerCase();
   
+  if (deviceType === 'family-hub' || name.includes('family hub') || name.includes('refrigerator')) return Home;
   if (deviceType === 'sensor' || name.includes('sensor') || name.includes('aqara')) return Activity;
   if (deviceType === 'dimmer' || name.includes('light') || name.includes('lamp')) return Lightbulb;
   if (deviceType === 'fan' || name.includes('fan')) return Fan;
@@ -129,6 +137,7 @@ const getDeviceStatus = (device: SmartHomeDevice, deviceType: string, liveStatus
   let presence = null;
   let motion = null;
   let illuminance = null;
+  let doorState = null;
 
   console.log(`Getting status for device ${device.device_name}:`, { 
     deviceType, 
@@ -142,6 +151,14 @@ const getDeviceStatus = (device: SmartHomeDevice, deviceType: string, liveStatus
     const mainComponent = liveStatus.components.main;
     
     console.log(`Live status main component for ${device.device_name}:`, mainComponent);
+    
+    // Check for Family Hub door status
+    if (deviceType === 'family-hub') {
+      if (mainComponent.contactSensor && mainComponent.contactSensor.contact && mainComponent.contactSensor.contact.value !== undefined) {
+        doorState = mainComponent.contactSensor.contact.value;
+        console.log(`Found door state: ${doorState}`);
+      }
+    }
     
     // Check for sensor data
     if (deviceType === 'sensor') {
@@ -242,13 +259,17 @@ const getDeviceStatus = (device: SmartHomeDevice, deviceType: string, liveStatus
     }
   }
   
-  const result = { state, level, fanSpeed, temperature, heatingSetpoint, coolingSetpoint, thermostatMode, presence, motion, illuminance };
+  const result = { state, level, fanSpeed, temperature, heatingSetpoint, coolingSetpoint, thermostatMode, presence, motion, illuminance, doorState };
   console.log(`Final status for ${device.device_name}:`, result);
   return result;
 };
 
 // Updated utility function to get status text
 const getStatusText = (deviceStatus: any, deviceType: string): string => {
+  if (deviceType === 'family-hub') {
+    return deviceStatus.doorState === 'open' ? 'Door Open' : 'Door Closed';
+  }
+  
   if (deviceType === 'sensor') {
     const statusParts = [];
     
@@ -302,6 +323,10 @@ const getStatusText = (deviceStatus: any, deviceType: string): string => {
 
 // Utility function to get status color for badges
 const getStatusColor = (deviceStatus: any, deviceType: string): string => {
+  if (deviceType === 'family-hub') {
+    return deviceStatus.doorState === 'open' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700';
+  }
+  
   if (deviceType === 'sensor') {
     if (deviceStatus.presence === 'present' || deviceStatus.motion === 'active') {
       return 'bg-green-600 hover:bg-green-700';
@@ -367,6 +392,9 @@ const DraggableDevice = ({
     },
   });
 
+  const [doorOpenTime, setDoorOpenTime] = useState<Date | null>(null);
+  const [elapsedTime, setElapsedTime] = useState<string>('');
+
   const deviceType = getDeviceTypeFromCapabilities(device.capabilities, device.device_type, device.device_name);
   const DeviceIcon = getDeviceIcon(deviceType, device.device_name);
   const deviceStatus = getDeviceStatus(device, deviceType, liveStatus);
@@ -375,8 +403,40 @@ const DraggableDevice = ({
   const isFan = deviceType === 'fan';
   const isThermostat = deviceType === 'thermostat';
   const isSensor = deviceType === 'sensor';
+  const isFamilyHub = deviceType === 'family-hub';
   const currentLevel = deviceStatus.level || 0;
   const currentFanSpeed = deviceStatus.fanSpeed || 0;
+
+  // Timer effect for Family Hub door open status
+  useEffect(() => {
+    if (isFamilyHub && deviceStatus.doorState === 'open') {
+      if (!doorOpenTime) {
+        setDoorOpenTime(new Date());
+      }
+    } else {
+      setDoorOpenTime(null);
+      setElapsedTime('');
+    }
+  }, [isFamilyHub, deviceStatus.doorState, doorOpenTime]);
+
+  // Update elapsed time every second when door is open
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (doorOpenTime) {
+      interval = setInterval(() => {
+        const now = new Date();
+        const diff = now.getTime() - doorOpenTime.getTime();
+        const minutes = Math.floor(diff / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+        setElapsedTime(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [doorOpenTime]);
 
   return (
     <div 
@@ -406,7 +466,24 @@ const DraggableDevice = ({
         </div>
       </div>
       
-      {isSensor ? (
+      {isFamilyHub ? (
+        <div className="space-y-2">
+          <div className="flex items-center space-x-3">
+            <DoorOpen className={`w-5 h-5 ${deviceStatus.doorState === 'open' ? 'text-red-400' : 'text-green-400'}`} />
+            <span className="text-sm text-blue-200">
+              Refrigerator Door: {deviceStatus.doorState === 'open' ? 'Open' : 'Closed'}
+            </span>
+          </div>
+          {deviceStatus.doorState === 'open' && elapsedTime && (
+            <div className="flex items-center space-x-3 bg-red-500/20 p-2 rounded">
+              <Timer className="w-4 h-4 text-red-400" />
+              <span className="text-sm text-red-200">
+                Door open for: {elapsedTime}
+              </span>
+            </div>
+          )}
+        </div>
+      ) : isSensor ? (
         <div className="space-y-2">
           <div className="text-sm text-blue-200">
             <div className="grid grid-cols-1 gap-1">
