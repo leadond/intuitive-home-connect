@@ -22,11 +22,18 @@ export const DeviceQuickActions = () => {
   const getRoomName = (roomId: string | null) => {
     if (!roomId) return 'Other';
     
-    // SmartThings room ID mappings - update these with your actual room IDs
+    // SmartThings room ID mappings - from the API response
     const roomMappings: Record<string, string> = {
+      'cc18dc80-d9b9-4e02-97dc-0d15db379260': 'Living room',
+      '8c0275df-a6e1-45d7-9ff3-f9d5c9d51b52': 'Kitchen',
       'fd2f09e3-063f-4d56-906f-c891312822e6': 'Master Bedroom',
-      'a5572f69-7130-4805-b4df-f174e19db38f': 'Living Room', // Add the room ID you mentioned
-      // Add more room ID mappings as needed - use the "Fetch Room Names" button to get the console output
+      '271e55a9-9a01-4bbf-a586-c753d0c52ea1': 'Office',
+      'fcf4684c-02c6-435a-ab9a-f3ba76e9fe47': 'Upstairs',
+      '402d5168-7baa-41d4-b8e4-30c9a65febf7': 'Movie Room',
+      'a5572f69-7130-4805-b4df-f174e19db38f': 'Patio',
+      'e4d6b3e9-2f3a-4693-a7a6-4fa03cbdfbd1': 'Front Door',
+      'ae8a41c1-0342-4f8f-b80d-f86e646b7749': 'Garage',
+      '9cf1f938-1b69-427a-9466-ca27d2c631c6': "Evan's Room",
     };
     
     return roomMappings[roomId] || `Room ${roomId.slice(0, 8)}`; // Show first 8 chars of ID if no mapping found
