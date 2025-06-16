@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -59,15 +58,19 @@ export const useSmartHomeData = () => {
           table: 'smart_home_devices'
         },
         (payload) => {
-          console.log('Real-time device update:', payload);
+          console.log('Real-time device update received:', payload);
+          console.log('Updated device status:', payload.new.status);
+          
           // Update the specific device in our local state
-          setDevices(prevDevices => 
-            prevDevices.map(device => 
+          setDevices(prevDevices => {
+            const updatedDevices = prevDevices.map(device => 
               device.id === payload.new.id 
                 ? { ...device, ...payload.new }
                 : device
-            )
-          );
+            );
+            console.log('Updated devices state:', updatedDevices);
+            return updatedDevices;
+          });
         }
       )
       .subscribe();
@@ -83,7 +86,7 @@ export const useSmartHomeData = () => {
           table: 'device_activity_logs'
         },
         (payload) => {
-          console.log('New activity log:', payload);
+          console.log('New activity log received:', payload);
           fetchActivityLogs(); // Refresh activity logs when new ones are added
         }
       )
@@ -117,16 +120,19 @@ export const useSmartHomeData = () => {
   };
 
   const fetchPlatforms = async () => {
+    console.log('Fetching platforms...');
     const { data, error } = await supabase
       .from('smart_home_platforms')
       .select('*')
       .order('platform_name');
 
     if (error) throw error;
+    console.log('Platforms fetched:', data);
     setPlatforms(data || []);
   };
 
   const fetchDevices = async () => {
+    console.log('Fetching devices...');
     const { data, error } = await supabase
       .from('smart_home_devices')
       .select(`
@@ -142,10 +148,12 @@ export const useSmartHomeData = () => {
       platform_name: device.smart_home_platforms?.platform_name || 'Unknown'
     })) || [];
     
+    console.log('Devices fetched:', devicesWithPlatform);
     setDevices(devicesWithPlatform);
   };
 
   const fetchActivityLogs = async () => {
+    console.log('Fetching activity logs...');
     const { data, error } = await supabase
       .from('device_activity_logs')
       .select(`
@@ -162,6 +170,7 @@ export const useSmartHomeData = () => {
       device_name: log.smart_home_devices?.device_name || 'Unknown Device'
     })) || [];
     
+    console.log('Activity logs fetched:', logsWithDeviceName);
     setActivityLogs(logsWithDeviceName);
   };
 
@@ -200,6 +209,7 @@ export const useSmartHomeData = () => {
   };
 
   const updateDeviceStatus = async (deviceId: string, status: any) => {
+    console.log(`Updating device ${deviceId} status:`, status);
     const { error } = await supabase
       .from('smart_home_devices')
       .update({ 
@@ -208,7 +218,11 @@ export const useSmartHomeData = () => {
       })
       .eq('id', deviceId);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error updating device status:', error);
+      throw error;
+    }
+    console.log('Device status updated successfully');
     await fetchDevices();
   };
 
@@ -221,6 +235,7 @@ export const useSmartHomeData = () => {
         throw new Error('Not authenticated');
       }
 
+      console.log('Sending control request to edge function...');
       const response = await supabase.functions.invoke('control-smartthings-device', {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -242,6 +257,7 @@ export const useSmartHomeData = () => {
       // The real-time subscription will handle updating the UI
       // But we can also update optimistically
       if (response.data?.status) {
+        console.log('Updating device status optimistically:', response.data.status);
         setDevices(prevDevices => 
           prevDevices.map(device => 
             device.id === deviceId 

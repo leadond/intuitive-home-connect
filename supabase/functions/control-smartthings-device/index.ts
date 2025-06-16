@@ -34,10 +34,13 @@ serve(async (req) => {
 
     const { deviceId, command, value } = await req.json()
 
-    console.log(`Controlling device ${deviceId} with command ${command}:`, value)
+    console.log(`=== DEVICE CONTROL DEBUG ===`)
+    console.log(`Device ID: ${deviceId}`)
+    console.log(`Command: ${command}`)
+    console.log(`Value: ${value}`)
     console.log(`User ID: ${user.id}`)
 
-    // Get the device details from our database - try both with and without user_id filter
+    // Get the device details from our database
     let { data: device, error: deviceError } = await supabaseClient
       .from('smart_home_devices')
       .select(`
@@ -54,16 +57,35 @@ serve(async (req) => {
       // Try to find device without user filter to see if it exists
       const { data: allDevices } = await supabaseClient
         .from('smart_home_devices')
-        .select('id, user_id, device_name')
+        .select('id, user_id, device_name, device_type, room, external_device_id')
         .eq('id', deviceId)
       
       console.log('Device search results:', allDevices)
       
+      // Also try searching by external_device_id in case there's confusion
+      const { data: externalDevices } = await supabaseClient
+        .from('smart_home_devices')
+        .select('id, user_id, device_name, device_type, room, external_device_id')
+        .eq('external_device_id', deviceId)
+      
+      console.log('External device search results:', externalDevices)
+      
       return new Response(
-        JSON.stringify({ error: 'Device not found or access denied', details: deviceError?.message }),
+        JSON.stringify({ 
+          error: 'Device not found or access denied', 
+          details: deviceError?.message,
+          searched_id: deviceId,
+          found_devices: allDevices || [],
+          external_matches: externalDevices || []
+        }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    console.log(`Found device: ${device.device_name} (${device.device_type})`)
+    console.log(`Device room: ${device.room}`)
+    console.log(`Device current status:`, device.status)
+    console.log(`External device ID: ${device.external_device_id}`)
 
     // Verify user owns this device
     if (device.user_id !== user.id) {
@@ -94,6 +116,8 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    console.log(`Using SmartThings device ID: ${smartThingsDeviceId}`)
 
     // Prepare the SmartThings API command
     let smartThingsCommand: any = {}
@@ -149,7 +173,7 @@ serve(async (req) => {
         )
     }
 
-    console.log('Sending command to SmartThings:', smartThingsCommand)
+    console.log('Sending command to SmartThings API:', smartThingsCommand)
 
     // Send command to SmartThings API
     const smartThingsResponse = await fetch(
@@ -173,12 +197,13 @@ serve(async (req) => {
       )
     }
 
-    console.log('Device command sent successfully')
+    console.log('Device command sent successfully to SmartThings')
 
     // Wait a moment for the device to respond, then fetch updated status
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise(resolve => setTimeout(resolve, 2000)) // Increased wait time
 
     // Fetch updated device status from SmartThings
+    console.log('Fetching updated device status...')
     const statusResponse = await fetch(
       `https://api.smartthings.com/v1/devices/${smartThingsDeviceId}/status`,
       {
@@ -192,7 +217,7 @@ serve(async (req) => {
     let updatedStatus = device.status
     if (statusResponse.ok) {
       const statusData = await statusResponse.json()
-      console.log('Updated device status from SmartThings:', statusData)
+      console.log('Updated device status from SmartThings:', JSON.stringify(statusData, null, 2))
       
       // Extract the status from SmartThings format
       if (statusData.components?.main) {
@@ -206,10 +231,14 @@ serve(async (req) => {
           thermostatSetpoint: mainComponent.thermostatHeatingSetpoint?.heatingSetpoint?.value,
           thermostatMode: mainComponent.thermostat?.thermostatMode?.value
         }
+        console.log('Processed status update:', updatedStatus)
       }
+    } else {
+      console.error('Failed to fetch updated status:', await statusResponse.text())
     }
 
     // Update the device status in our database
+    console.log('Updating device status in database...')
     const { error: updateError } = await supabaseClient
       .from('smart_home_devices')
       .update({ 
@@ -220,13 +249,17 @@ serve(async (req) => {
 
     if (updateError) {
       console.error('Error updating device status:', updateError)
+    } else {
+      console.log('Device status updated in database successfully')
     }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Device controlled successfully',
-        status: updatedStatus
+        message: `${device.device_name} controlled successfully`,
+        status: updatedStatus,
+        device_name: device.device_name,
+        room: device.room
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
