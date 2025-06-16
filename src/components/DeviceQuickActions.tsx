@@ -23,6 +23,7 @@ import { useSmartHomeData, SmartHomeDevice } from "@/hooks/useSmartHomeData";
 import { useSmartThingsStatus } from "@/hooks/useSmartThingsStatus";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
+import { ThermostatControlDialog } from "@/components/ThermostatControlDialog";
 
 // Utility function to determine device type from capabilities
 const getDeviceTypeFromCapabilities = (capabilities: any, deviceType: string, deviceName: string): string => {
@@ -240,6 +241,7 @@ export const DeviceQuickActions = () => {
   const { toast } = useToast();
   const [liveStatuses, setLiveStatuses] = useState<Record<string, any>>({});
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedThermostat, setSelectedThermostat] = useState<SmartHomeDevice | null>(null);
 
   // Function to convert room IDs to readable room names
   const getRoomName = (roomId: string | null) => {
@@ -442,239 +444,183 @@ export const DeviceQuickActions = () => {
   }
 
   return (
-    <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-white">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center">
-            <Wifi className="w-6 h-6 mr-2 text-blue-400" />
-            Device Quick Actions
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={refreshLiveStatuses}
-            disabled={refreshing}
-            className="text-blue-300 hover:text-white hover:bg-white/10"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          </Button>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          {Object.keys(devicesByRoom).length === 0 ? (
-            <p className="text-blue-300 text-center py-4">No devices found. Connect your smart home platforms in the Admin panel.</p>
-          ) : (
-            Object.entries(devicesByRoom).map(([room, roomDevices]) => (
-              <div key={room}>
-                <h3 className="text-lg font-semibold text-blue-200 mb-3">{room}</h3>
-                <div className="grid grid-cols-1 gap-4">
-                  {roomDevices.map((device) => {
-                    const deviceType = getDeviceTypeFromCapabilities(device.capabilities, device.device_type, device.device_name);
-                    const DeviceIcon = getDeviceIcon(deviceType, device.device_name);
-                    const liveStatus = liveStatuses[device.device_id];
-                    const deviceStatus = getDeviceStatus(device, deviceType, liveStatus);
-                    const isDimmer = deviceType === 'dimmer';
-                    const isFan = deviceType === 'fan';
-                    const isThermostat = deviceType === 'thermostat';
-                    const currentLevel = deviceStatus.level || 0;
-                    const currentFanSpeed = deviceStatus.fanSpeed || 0;
-                    
-                    console.log(`Rendering device ${device.device_name}:`, { deviceType, deviceStatus, isThermostat });
-                    
-                    return (
-                      <div 
-                        key={device.id}
-                        className="p-4 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200"
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-3">
-                            <div className="p-3 rounded-lg bg-white/10">
-                              <DeviceIcon className="w-8 h-8 text-blue-400" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-sm">{device.device_name}</p>
-                              <p className="text-xs text-blue-300">{device.platform_name}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Badge className={getStatusColor(deviceStatus, deviceType)}>
-                              {getStatusText(deviceStatus, deviceType)}
-                            </Badge>
-                          </div>
-                        </div>
-                        
-                        {isThermostat ? (
-                          <div className="space-y-4">
-                            {/* Current Temperature Display */}
-                            {deviceStatus.temperature !== null && (
-                              <div className="text-center p-4 rounded-lg bg-white/5 border border-white/10">
-                                <p className="text-3xl font-bold text-white">{Math.round(deviceStatus.temperature)}°F</p>
-                                <p className="text-sm text-blue-200 mt-1">Current Temperature</p>
+    <>
+      <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-white">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Wifi className="w-6 h-6 mr-2 text-blue-400" />
+              Device Quick Actions
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={refreshLiveStatuses}
+              disabled={refreshing}
+              className="text-blue-300 hover:text-white hover:bg-white/10"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            {Object.keys(devicesByRoom).length === 0 ? (
+              <p className="text-blue-300 text-center py-4">No devices found. Connect your smart home platforms in the Admin panel.</p>
+            ) : (
+              Object.entries(devicesByRoom).map(([room, roomDevices]) => (
+                <div key={room}>
+                  <h3 className="text-lg font-semibold text-blue-200 mb-3">{room}</h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    {roomDevices.map((device) => {
+                      const deviceType = getDeviceTypeFromCapabilities(device.capabilities, device.device_type, device.device_name);
+                      const DeviceIcon = getDeviceIcon(deviceType, device.device_name);
+                      const liveStatus = liveStatuses[device.device_id];
+                      const deviceStatus = getDeviceStatus(device, deviceType, liveStatus);
+                      const isDimmer = deviceType === 'dimmer';
+                      const isFan = deviceType === 'fan';
+                      const isThermostat = deviceType === 'thermostat';
+                      const currentLevel = deviceStatus.level || 0;
+                      const currentFanSpeed = deviceStatus.fanSpeed || 0;
+                      
+                      console.log(`Rendering device ${device.device_name}:`, { deviceType, deviceStatus, isThermostat });
+                      
+                      return (
+                        <div 
+                          key={device.id}
+                          className="p-4 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200"
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-3">
+                              <div className="p-3 rounded-lg bg-white/10">
+                                <DeviceIcon className="w-8 h-8 text-blue-400" />
                               </div>
-                            )}
-                            
-                            {/* Thermostat Mode Selection */}
+                              <div>
+                                <p className="font-medium text-sm">{device.device_name}</p>
+                                <p className="text-xs text-blue-300">{device.platform_name}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Badge className={getStatusColor(deviceStatus, deviceType)}>
+                                {getStatusText(deviceStatus, deviceType)}
+                              </Badge>
+                            </div>
+                          </div>
+                          
+                          {isThermostat ? (
+                            <div className="flex justify-center">
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="text-white hover:bg-white/20"
+                                onClick={() => handleThermostatClick(device)}
+                              >
+                                Control Thermostat
+                              </Button>
+                            </div>
+                          ) : isDimmer ? (
                             <div className="space-y-3">
-                              <p className="text-sm font-medium text-blue-200">Thermostat Mode</p>
-                              <div className="grid grid-cols-2 gap-2">
-                                {[
-                                  { mode: 'off', label: 'Off', color: 'bg-gray-600 hover:bg-gray-700' },
-                                  { mode: 'heat', label: 'Heat', color: 'bg-orange-600 hover:bg-orange-700' },
-                                  { mode: 'cool', label: 'Cool', color: 'bg-blue-600 hover:bg-blue-700' },
-                                  { mode: 'auto', label: 'Auto', color: 'bg-green-600 hover:bg-green-700' }
-                                ].map(({ mode, label, color }) => (
-                                  <Button
-                                    key={mode}
-                                    size="sm"
-                                    variant={deviceStatus.thermostatMode === mode ? "default" : "outline"}
-                                    className={`${
-                                      deviceStatus.thermostatMode === mode 
-                                        ? `${color} text-white border-0` 
-                                        : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
-                                    } transition-all duration-200`}
-                                    onClick={() => handleThermostatModeChange(device, mode)}
-                                    disabled={isUpdating}
-                                  >
-                                    {label}
-                                  </Button>
-                                ))}
+                              <div className="flex items-center space-x-3">
+                                <Switch
+                                  checked={deviceStatus.state === 'on'}
+                                  onCheckedChange={() => handleToggleDevice(device)}
+                                  disabled={isUpdating}
+                                  className="data-[state=checked]:bg-blue-600"
+                                />
+                                <span className="text-sm text-blue-200">Power</span>
                               </div>
-                            </div>
-                            
-                            {/* Heating Setpoint */}
-                            {(deviceStatus.thermostatMode === 'heat' || deviceStatus.thermostatMode === 'auto') && (
-                              <div className="space-y-3">
+                              <div className="space-y-2">
                                 <div className="flex items-center justify-between">
-                                  <p className="text-sm font-medium text-blue-200">Heat to</p>
-                                  <p className="text-lg font-bold text-orange-300">{deviceStatus.heatingSetpoint || 70}°F</p>
+                                  <span className="text-sm text-blue-200">Brightness</span>
+                                  <span className="text-sm text-white">{currentLevel}%</span>
                                 </div>
                                 <Slider
-                                  value={[deviceStatus.heatingSetpoint || 70]}
-                                  onValueChange={(value) => handleSetpointChange(device, 'heating', value)}
-                                  max={85}
-                                  min={50}
+                                  value={[currentLevel]}
+                                  onValueChange={(value) => {
+                                    console.log(`Dimmer slider changed for ${device.device_name}:`, value);
+                                    handleDimmerChange(device, value);
+                                  }}
+                                  max={100}
+                                  step={1}
+                                  disabled={isUpdating}
+                                  className="w-full"
+                                />
+                              </div>
+                            </div>
+                          ) : isFan ? (
+                            <div className="space-y-3">
+                              <div className="flex items-center space-x-3">
+                                <Switch
+                                  checked={deviceStatus.state === 'on'}
+                                  onCheckedChange={() => handleToggleDevice(device)}
+                                  disabled={isUpdating}
+                                  className="data-[state=checked]:bg-blue-600"
+                                />
+                                <span className="text-sm text-blue-200">Power</span>
+                              </div>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-blue-200">Fan Speed</span>
+                                  <span className="text-sm text-white">
+                                    {currentFanSpeed === 0 ? 'Off' : `Speed ${currentFanSpeed}`}
+                                  </span>
+                                </div>
+                                <Slider
+                                  value={[currentFanSpeed]}
+                                  onValueChange={(value) => handleFanSpeedChange(device, value)}
+                                  max={4}
+                                  min={0}
                                   step={1}
                                   disabled={isUpdating}
                                   className="w-full"
                                 />
                                 <div className="flex justify-between text-xs text-blue-300">
-                                  <span>50°F</span>
-                                  <span>85°F</span>
+                                  <span>Off</span>
+                                  <span>1</span>
+                                  <span>2</span>
+                                  <span>3</span>
+                                  <span>4</span>
                                 </div>
                               </div>
-                            )}
-                            
-                            {/* Cooling Setpoint */}
-                            {(deviceStatus.thermostatMode === 'cool' || deviceStatus.thermostatMode === 'auto') && (
-                              <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <p className="text-sm font-medium text-blue-200">Cool to</p>
-                                  <p className="text-lg font-bold text-blue-300">{deviceStatus.coolingSetpoint || 75}°F</p>
-                                </div>
-                                <Slider
-                                  value={[deviceStatus.coolingSetpoint || 75]}
-                                  onValueChange={(value) => handleSetpointChange(device, 'cooling', value)}
-                                  max={85}
-                                  min={50}
-                                  step={1}
-                                  disabled={isUpdating}
-                                  className="w-full"
-                                />
-                                <div className="flex justify-between text-xs text-blue-300">
-                                  <span>50°F</span>
-                                  <span>85°F</span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ) : isDimmer ? (
-                          <div className="space-y-3">
-                            <div className="flex items-center space-x-3">
-                              <Switch
-                                checked={deviceStatus.state === 'on'}
-                                onCheckedChange={() => handleToggleDevice(device)}
-                                disabled={isUpdating}
-                                className="data-[state=checked]:bg-blue-600"
-                              />
-                              <span className="text-sm text-blue-200">Power</span>
                             </div>
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm text-blue-200">Brightness</span>
-                                <span className="text-sm text-white">{currentLevel}%</span>
-                              </div>
-                              <Slider
-                                value={[currentLevel]}
-                                onValueChange={(value) => {
-                                  console.log(`Dimmer slider changed for ${device.device_name}:`, value);
-                                  handleDimmerChange(device, value);
-                                }}
-                                max={100}
-                                step={1}
+                          ) : (
+                            <div className="flex justify-center">
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="text-white hover:bg-white/20"
+                                onClick={() => handleToggleDevice(device)}
                                 disabled={isUpdating}
-                                className="w-full"
-                              />
+                              >
+                                {isUpdating ? 'Updating...' : 'Toggle'}
+                              </Button>
                             </div>
-                          </div>
-                        ) : isFan ? (
-                          <div className="space-y-3">
-                            <div className="flex items-center space-x-3">
-                              <Switch
-                                checked={deviceStatus.state === 'on'}
-                                onCheckedChange={() => handleToggleDevice(device)}
-                                disabled={isUpdating}
-                                className="data-[state=checked]:bg-blue-600"
-                              />
-                              <span className="text-sm text-blue-200">Power</span>
-                            </div>
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm text-blue-200">Fan Speed</span>
-                                <span className="text-sm text-white">
-                                  {currentFanSpeed === 0 ? 'Off' : `Speed ${currentFanSpeed}`}
-                                </span>
-                              </div>
-                              <Slider
-                                value={[currentFanSpeed]}
-                                onValueChange={(value) => handleFanSpeedChange(device, value)}
-                                max={4}
-                                min={0}
-                                step={1}
-                                disabled={isUpdating}
-                                className="w-full"
-                              />
-                              <div className="flex justify-between text-xs text-blue-300">
-                                <span>Off</span>
-                                <span>1</span>
-                                <span>2</span>
-                                <span>3</span>
-                                <span>4</span>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex justify-center">
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              className="text-white hover:bg-white/20"
-                              onClick={() => handleToggleDevice(device)}
-                              disabled={isUpdating}
-                            >
-                              {isUpdating ? 'Updating...' : 'Toggle'}
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Thermostat Control Dialog */}
+      {selectedThermostat && (
+        <ThermostatControlDialog
+          device={selectedThermostat}
+          isOpen={!!selectedThermostat}
+          onClose={() => setSelectedThermostat(null)}
+          deviceStatus={getDeviceStatus(
+            selectedThermostat, 
+            getDeviceTypeFromCapabilities(selectedThermostat.capabilities, selectedThermostat.device_type, selectedThermostat.device_name), 
+            liveStatuses[selectedThermostat.device_id]
           )}
-        </div>
-      </CardContent>
-    </Card>
+          onStatusUpdate={refreshLiveStatuses}
+        />
+      )}
+    </>
   );
 };
