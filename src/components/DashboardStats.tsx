@@ -1,4 +1,5 @@
 
+
 import { Card, CardContent } from "@/components/ui/card";
 import { 
   Lightbulb, 
@@ -76,6 +77,29 @@ export const DashboardStats = () => {
     d.status?.locked
   ).length;
 
+  // Helper function to safely extract thermostat mode as string
+  const getThermostatModeString = (status: any): string => {
+    if (!status) return 'auto';
+    
+    // Handle if thermostatMode is a string
+    if (typeof status.thermostatMode === 'string') {
+      return status.thermostatMode;
+    }
+    
+    // Handle if mode is a string
+    if (typeof status.mode === 'string') {
+      return status.mode;
+    }
+    
+    // Handle if thermostatMode is an object with a thermostatMode property
+    if (status.thermostatMode && typeof status.thermostatMode === 'object' && status.thermostatMode.thermostatMode) {
+      return String(status.thermostatMode.thermostatMode);
+    }
+    
+    // Default fallback
+    return 'auto';
+  };
+
   const stats = [
     {
       title: "Smart Lights",
@@ -88,7 +112,7 @@ export const DashboardStats = () => {
     {
       title: "Climate Control",
       value: typeof currentTemp === 'number' ? `${currentTemp}°F` : currentTemp,
-      subtitle: climateDevices[0]?.status?.thermostatMode || climateDevices[0]?.status?.mode || `${climateDevices.length} devices`,
+      subtitle: getThermostatModeString(climateDevices[0]?.status) || `${climateDevices.length} devices`,
       icon: Thermometer,
       color: "text-blue-400",
       bgColor: "bg-blue-400/20"
@@ -148,3 +172,4 @@ export const DashboardStats = () => {
     </div>
   );
 };
+
