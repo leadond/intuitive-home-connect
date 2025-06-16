@@ -68,47 +68,65 @@ const getDeviceStatus = (device: SmartHomeDevice, deviceType: string, liveStatus
   let level = 0;
   let fanSpeed = 0;
 
+  console.log(`Getting status for device ${device.device_name}:`, { 
+    deviceType, 
+    hasLiveStatus: !!liveStatus,
+    liveStatusKeys: liveStatus ? Object.keys(liveStatus) : [],
+    capabilities: device.capabilities 
+  });
+
   // First, try to get status from live data if available
   if (liveStatus && liveStatus.components && liveStatus.components.main) {
     const mainComponent = liveStatus.components.main;
     
+    console.log(`Live status main component for ${device.device_name}:`, mainComponent);
+    
     // Check for switch state
     if (mainComponent.switch && mainComponent.switch.switch && mainComponent.switch.switch.value) {
       state = mainComponent.switch.switch.value;
+      console.log(`Found switch state: ${state}`);
     }
     
     // Check for level (dimmer) - only for non-fan devices
     if (deviceType !== 'fan' && mainComponent.switchLevel && mainComponent.switchLevel.level && mainComponent.switchLevel.level.value !== undefined) {
       level = mainComponent.switchLevel.level.value;
+      console.log(`Found dimmer level: ${level}`);
     }
     
     // Check for fan speed - only for fan devices
     if (deviceType === 'fan' && mainComponent.fanSpeed && mainComponent.fanSpeed.fanSpeed && mainComponent.fanSpeed.fanSpeed.value !== undefined) {
       fanSpeed = mainComponent.fanSpeed.fanSpeed.value;
+      console.log(`Found fan speed: ${fanSpeed}`);
     }
   }
   
   // Fallback to stored device capabilities if live data doesn't have what we need
   if (state === 'unknown' && device.capabilities && Array.isArray(device.capabilities)) {
+    console.log(`Falling back to stored capabilities for ${device.device_name}`);
     for (const component of device.capabilities) {
       if (component && typeof component === 'object') {
         // Check for switch state
         if (component.switch && component.switch.switch) {
           state = component.switch.switch.value || 'unknown';
+          console.log(`Found stored switch state: ${state}`);
         }
         // Check for level (dimmer) - only for non-fan devices
         if (deviceType !== 'fan' && component.switchLevel && component.switchLevel.level) {
           level = component.switchLevel.level.value || 0;
+          console.log(`Found stored dimmer level: ${level}`);
         }
         // Check for fan speed - only for fan devices
         if (deviceType === 'fan' && component.fanSpeed && component.fanSpeed.fanSpeed) {
           fanSpeed = component.fanSpeed.fanSpeed.value || 0;
+          console.log(`Found stored fan speed: ${fanSpeed}`);
         }
       }
     }
   }
   
-  return { state, level, fanSpeed };
+  const result = { state, level, fanSpeed };
+  console.log(`Final status for ${device.device_name}:`, result);
+  return result;
 };
 
 // Utility function to get status color based on device state
@@ -186,6 +204,8 @@ export const DeviceQuickActions = () => {
   const handleDimmerChange = async (device: SmartHomeDevice, value: number[]) => {
     try {
       const level = value[0];
+      console.log(`Attempting to set dimmer level for ${device.device_name} to ${level}%`);
+      
       await sendDeviceCommand(device.device_id, 'switchLevel', 'setLevel', [level]);
       await logActivity(device.id, `Set brightness to ${level}%`, { level });
       
@@ -198,6 +218,11 @@ export const DeviceQuickActions = () => {
       setTimeout(() => refreshLiveStatuses(), 1000);
     } catch (error) {
       console.error('Error changing dimmer level:', error);
+      toast({
+        title: "Dimmer Error",
+        description: `Failed to change brightness for ${device.device_name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
     }
   };
 
@@ -361,7 +386,10 @@ export const DeviceQuickActions = () => {
                               </div>
                               <Slider
                                 value={[currentLevel]}
-                                onValueChange={(value) => handleDimmerChange(device, value)}
+                                onValueChange={(value) => {
+                                  console.log(`Dimmer slider changed for ${device.device_name}:`, value);
+                                  handleDimmerChange(device, value);
+                                }}
                                 max={100}
                                 step={1}
                                 disabled={isUpdating}
