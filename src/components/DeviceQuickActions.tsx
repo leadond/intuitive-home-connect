@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -117,7 +118,13 @@ export const DeviceQuickActions = () => {
         if (status.temperature) {
           return `${status.temperature}°`;
         }
-        const thermostatMode = typeof status.mode === 'string' ? status.mode : 'auto';
+        // Ensure we always return a string for thermostat mode
+        let thermostatMode = 'auto';
+        if (typeof status.thermostatMode === 'string') {
+          thermostatMode = status.thermostatMode;
+        } else if (typeof status.mode === 'string') {
+          thermostatMode = status.mode;
+        }
         return thermostatMode;
       case 'speaker':
       case 'audio':
@@ -358,11 +365,13 @@ export const DeviceQuickActions = () => {
         );
         
       case 'thermostat':
-        const thermostatModeValue = typeof device.status?.thermostatMode === 'string' 
-          ? device.status.thermostatMode 
-          : typeof device.status?.mode === 'string' 
-          ? device.status.mode 
-          : 'auto';
+        // Ensure thermostatModeValue is always a string
+        let thermostatModeValue = 'auto';
+        if (typeof device.status?.thermostatMode === 'string') {
+          thermostatModeValue = device.status.thermostatMode;
+        } else if (typeof device.status?.mode === 'string') {
+          thermostatModeValue = device.status.mode;
+        }
           
         return (
           <div className="space-y-2">
