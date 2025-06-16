@@ -27,8 +27,10 @@ export const useKonnectedSync = () => {
         throw new Error('Konnected platform not configured');
       }
 
-      // Extract web server config from YAML
-      const yamlConfig = platforms.credentials?.yaml_config;
+      // Extract web server config from YAML - fix type assertion
+      const credentials = platforms.credentials as { yaml_config?: string } | null;
+      const yamlConfig = credentials?.yaml_config;
+      
       if (!yamlConfig) {
         throw new Error('YAML configuration not found');
       }
