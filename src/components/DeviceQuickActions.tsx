@@ -76,6 +76,10 @@ const getDeviceStatus = (device: SmartHomeDevice, deviceType: string, liveStatus
   let state = 'unknown';
   let level = 0;
   let fanSpeed = 0;
+  let temperature = null;
+  let heatingSetpoint = null;
+  let coolingSetpoint = null;
+  let thermostatMode = 'off';
 
   console.log(`Getting status for device ${device.device_name}:`, { 
     deviceType, 
@@ -107,6 +111,29 @@ const getDeviceStatus = (device: SmartHomeDevice, deviceType: string, liveStatus
       fanSpeed = mainComponent.fanSpeed.fanSpeed.value;
       console.log(`Found fan speed: ${fanSpeed}`);
     }
+
+    // Check for thermostat data
+    if (deviceType === 'thermostat') {
+      if (mainComponent.temperatureMeasurement && mainComponent.temperatureMeasurement.temperature && mainComponent.temperatureMeasurement.temperature.value !== undefined) {
+        temperature = mainComponent.temperatureMeasurement.temperature.value;
+        console.log(`Found current temperature: ${temperature}`);
+      }
+      
+      if (mainComponent.thermostatHeatingSetpoint && mainComponent.thermostatHeatingSetpoint.heatingSetpoint && mainComponent.thermostatHeatingSetpoint.heatingSetpoint.value !== undefined) {
+        heatingSetpoint = mainComponent.thermostatHeatingSetpoint.heatingSetpoint.value;
+        console.log(`Found heating setpoint: ${heatingSetpoint}`);
+      }
+      
+      if (mainComponent.thermostatCoolingSetpoint && mainComponent.thermostatCoolingSetpoint.coolingSetpoint && mainComponent.thermostatCoolingSetpoint.coolingSetpoint.value !== undefined) {
+        coolingSetpoint = mainComponent.thermostatCoolingSetpoint.coolingSetpoint.value;
+        console.log(`Found cooling setpoint: ${coolingSetpoint}`);
+      }
+      
+      if (mainComponent.thermostatMode && mainComponent.thermostatMode.thermostatMode && mainComponent.thermostatMode.thermostatMode.value) {
+        thermostatMode = mainComponent.thermostatMode.thermostatMode.value;
+        console.log(`Found thermostat mode: ${thermostatMode}`);
+      }
+    }
   }
   
   // Fallback to stored device capabilities if live data doesn't have what we need
@@ -129,24 +156,52 @@ const getDeviceStatus = (device: SmartHomeDevice, deviceType: string, liveStatus
           fanSpeed = component.fanSpeed.fanSpeed.value || 0;
           console.log(`Found stored fan speed: ${fanSpeed}`);
         }
+        // Check for thermostat data
+        if (deviceType === 'thermostat') {
+          if (component.temperatureMeasurement && component.temperatureMeasurement.temperature) {
+            temperature = component.temperatureMeasurement.temperature.value;
+          }
+          if (component.thermostatHeatingSetpoint && component.thermostatHeatingSetpoint.heatingSetpoint) {
+            heatingSetpoint = component.thermostatHeatingSetpoint.heatingSetpoint.value;
+          }
+          if (component.thermostatCoolingSetpoint && component.thermostatCoolingSetpoint.coolingSetpoint) {
+            coolingSetpoint = component.thermostatCoolingSetpoint.coolingSetpoint.value;
+          }
+          if (component.thermostatMode && component.thermostatMode.thermostatMode) {
+            thermostatMode = component.thermostatMode.thermostatMode.value || 'off';
+          }
+        }
       }
     }
   }
   
-  const result = { state, level, fanSpeed };
+  const result = { state, level, fanSpeed, temperature, heatingSetpoint, coolingSetpoint, thermostatMode };
   console.log(`Final status for ${device.device_name}:`, result);
   return result;
 };
 
-// Utility function to get status color based on device state
-const getStatusColor = (deviceStatus: any, deviceType: string): string => {
-  if (deviceStatus.state === 'on') return 'bg-green-600 hover:bg-green-600';
-  if (deviceStatus.state === 'off') return 'bg-gray-600 hover:bg-gray-600';
-  return 'bg-yellow-600 hover:bg-yellow-600';
-};
-
 // Updated utility function to get status text
 const getStatusText = (deviceStatus: any, deviceType: string): string => {
+  if (deviceType === 'thermostat') {
+    const mode = deviceStatus.thermostatMode || 'off';
+    const temp = deviceStatus.temperature;
+    const heating = deviceStatus.heatingSetpoint;
+    const cooling = deviceStatus.coolingSetpoint;
+    
+    if (temp !== null) {
+      if (mode === 'heat' && heating) {
+        return `${temp}°F (Heat ${heating}°F)`;
+      } else if (mode === 'cool' && cooling) {
+        return `${temp}°F (Cool ${cooling}°F)`;
+      } else if (mode === 'auto') {
+        return `${temp}°F (Auto)`;
+      } else {
+        return `${temp}°F (${mode})`;
+      }
+    }
+    return mode.charAt(0).toUpperCase() + mode.slice(1);
+  }
+  
   if (deviceStatus.state === 'on') {
     if (deviceType === 'dimmer' && deviceStatus.level > 0) {
       return `ON (${deviceStatus.level}%)`;
@@ -254,6 +309,46 @@ export const DeviceQuickActions = () => {
     }
   };
 
+  // Handler function for thermostat mode changes
+  const handleThermostatModeChange = async (device: SmartHomeDevice, mode: string) => {
+    try {
+      await sendDeviceCommand(device.device_id, 'thermostatMode', 'setThermostatMode', [mode]);
+      await logActivity(device.id, `Set thermostat mode to ${mode}`, { mode });
+      
+      toast({
+        title: "Thermostat Mode Updated",
+        description: `${device.device_name} set to ${mode} mode`,
+      });
+      
+      // Refresh status after a short delay
+      setTimeout(() => refreshLiveStatuses(), 1000);
+    } catch (error) {
+      console.error('Error changing thermostat mode:', error);
+    }
+  };
+
+  // Handler function for thermostat setpoint changes
+  const handleSetpointChange = async (device: SmartHomeDevice, setpointType: 'heating' | 'cooling', value: number[]) => {
+    try {
+      const temperature = value[0];
+      const capability = setpointType === 'heating' ? 'thermostatHeatingSetpoint' : 'thermostatCoolingSetpoint';
+      const command = setpointType === 'heating' ? 'setHeatingSetpoint' : 'setCoolingSetpoint';
+      
+      await sendDeviceCommand(device.device_id, capability, command, [temperature]);
+      await logActivity(device.id, `Set ${setpointType} setpoint to ${temperature}°F`, { setpointType, temperature });
+      
+      toast({
+        title: "Temperature Updated",
+        description: `${device.device_name} ${setpointType} set to ${temperature}°F`,
+      });
+      
+      // Refresh status after a short delay
+      setTimeout(() => refreshLiveStatuses(), 1000);
+    } catch (error) {
+      console.error(`Error changing ${setpointType} setpoint:`, error);
+    }
+  };
+
   const refreshLiveStatuses = async () => {
     setRefreshing(true);
     const newStatuses: Record<string, any> = {};
@@ -350,6 +445,7 @@ export const DeviceQuickActions = () => {
                     const deviceStatus = getDeviceStatus(device, deviceType, liveStatus);
                     const isDimmer = deviceType === 'dimmer';
                     const isFan = deviceType === 'fan';
+                    const isThermostat = deviceType === 'thermostat';
                     const currentLevel = deviceStatus.level || 0;
                     const currentFanSpeed = deviceStatus.fanSpeed || 0;
                     
@@ -377,7 +473,74 @@ export const DeviceQuickActions = () => {
                           </div>
                         </div>
                         
-                        {isDimmer ? (
+                        {isThermostat ? (
+                          <div className="space-y-4">
+                            {/* Current Temperature Display */}
+                            {deviceStatus.temperature !== null && (
+                              <div className="text-center p-3 rounded-lg bg-white/5">
+                                <p className="text-2xl font-bold text-white">{deviceStatus.temperature}°F</p>
+                                <p className="text-sm text-blue-200">Current Temperature</p>
+                              </div>
+                            )}
+                            
+                            {/* Thermostat Mode Selection */}
+                            <div className="space-y-2">
+                              <span className="text-sm text-blue-200">Mode</span>
+                              <div className="grid grid-cols-4 gap-2">
+                                {['off', 'heat', 'cool', 'auto'].map((mode) => (
+                                  <Button
+                                    key={mode}
+                                    size="sm"
+                                    variant={deviceStatus.thermostatMode === mode ? "default" : "ghost"}
+                                    className={`text-xs ${deviceStatus.thermostatMode === mode ? 'bg-blue-600 hover:bg-blue-700' : 'text-white hover:bg-white/20'}`}
+                                    onClick={() => handleThermostatModeChange(device, mode)}
+                                    disabled={isUpdating}
+                                  >
+                                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                            
+                            {/* Heating Setpoint */}
+                            {(deviceStatus.thermostatMode === 'heat' || deviceStatus.thermostatMode === 'auto') && (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-blue-200">Heat to</span>
+                                  <span className="text-sm text-white">{deviceStatus.heatingSetpoint || 70}°F</span>
+                                </div>
+                                <Slider
+                                  value={[deviceStatus.heatingSetpoint || 70]}
+                                  onValueChange={(value) => handleSetpointChange(device, 'heating', value)}
+                                  max={85}
+                                  min={50}
+                                  step={1}
+                                  disabled={isUpdating}
+                                  className="w-full"
+                                />
+                              </div>
+                            )}
+                            
+                            {/* Cooling Setpoint */}
+                            {(deviceStatus.thermostatMode === 'cool' || deviceStatus.thermostatMode === 'auto') && (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm text-blue-200">Cool to</span>
+                                  <span className="text-sm text-white">{deviceStatus.coolingSetpoint || 75}°F</span>
+                                </div>
+                                <Slider
+                                  value={[deviceStatus.coolingSetpoint || 75]}
+                                  onValueChange={(value) => handleSetpointChange(device, 'cooling', value)}
+                                  max={85}
+                                  min={50}
+                                  step={1}
+                                  disabled={isUpdating}
+                                  className="w-full"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        ) : isDimmer ? (
                           <div className="space-y-3">
                             <div className="flex items-center space-x-3">
                               <Switch
