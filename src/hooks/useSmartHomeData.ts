@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -280,20 +279,18 @@ export const useSmartHomeData = () => {
       const deviceIds = devicesToDelete?.map(d => d.id) || [];
       console.log(`Found ${deviceIds.length} devices to delete:`, deviceIds);
 
-      // Step 3: Delete all activity logs for these devices first
-      if (deviceIds.length > 0) {
-        const { error: logsError } = await supabase
-          .from('device_activity_logs')
-          .delete()
-          .eq('user_id', user.id)
-          .in('device_id', deviceIds);
+      // Step 3: Delete ALL activity logs for this user first (safer approach)
+      console.log('Deleting all activity logs for user to avoid foreign key issues...');
+      const { error: allLogsError } = await supabase
+        .from('device_activity_logs')
+        .delete()
+        .eq('user_id', user.id);
 
-        if (logsError) {
-          console.error('Error deleting activity logs:', logsError);
-          throw logsError;
-        }
-        console.log('Successfully deleted all activity logs for devices');
+      if (allLogsError) {
+        console.error('Error deleting all activity logs:', allLogsError);
+        throw allLogsError;
       }
+      console.log('Successfully deleted all activity logs for user');
 
       // Step 4: Delete all devices for these platforms
       if (platformIds.length > 0) {
