@@ -14,8 +14,7 @@ import {
   Shield,
   Wifi,
   AlertCircle,
-  RefreshCw,
-  Trash2
+  RefreshCw
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
@@ -25,14 +24,13 @@ import { ClearPlatformData } from "@/components/ClearPlatformData";
 
 const Admin = () => {
   const { toast } = useToast();
-  const { platforms, addPlatform, syncSmartThingsDevices, removeDuplicatePlatforms, disconnectPlatform, isLoading } = useSmartHomeData();
+  const { platforms, addPlatform, syncSmartThingsDevices, isLoading } = useSmartHomeData();
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [syncing, setSyncing] = useState(false);
-  const [cleaning, setCleaning] = useState(false);
 
   // Available platforms that users can connect to
   const availablePlatforms = [
@@ -194,12 +192,11 @@ const Admin = () => {
     }
   };
 
-  const handleDisconnect = async (platformName: string) => {
-    try {
-      await disconnectPlatform(platformName);
-    } catch (error) {
-      // Error is already handled in the hook
-    }
+  const handleDisconnect = (platformName: string) => {
+    toast({
+      title: "Platform Disconnected",
+      description: `${platformName} has been disconnected successfully.`,
+    });
   };
 
   const handleSyncSmartThings = async () => {
@@ -210,17 +207,6 @@ const Admin = () => {
       // Error is already handled in the hook
     } finally {
       setSyncing(false);
-    }
-  };
-
-  const handleCleanupDuplicates = async () => {
-    setCleaning(true);
-    try {
-      await removeDuplicatePlatforms();
-    } catch (error) {
-      // Error is already handled in the hook
-    } finally {
-      setCleaning(false);
     }
   };
 
@@ -260,15 +246,6 @@ const Admin = () => {
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
               {syncing ? 'Syncing...' : 'Sync SmartThings'}
-            </Button>
-            <Button 
-              onClick={handleCleanupDuplicates}
-              disabled={cleaning}
-              variant="outline"
-              className="border-orange-500 text-orange-400 hover:bg-orange-500/10"
-            >
-              <Trash2 className={`w-4 h-4 mr-2 ${cleaning ? 'animate-spin' : ''}`} />
-              {cleaning ? 'Cleaning...' : 'Clean Up Duplicates'}
             </Button>
             <Badge className="bg-blue-600 hover:bg-blue-600">
               {platformsWithStatus.filter(p => p.status === "connected").length} / {platformsWithStatus.length} Connected

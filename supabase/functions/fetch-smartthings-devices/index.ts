@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -31,17 +32,16 @@ serve(async (req) => {
       )
     }
 
-    // Get SmartThings platform credentials for the user - get the most recent one if multiple exist
+    // Get SmartThings platform credentials for the user
     const { data: platforms, error: platformError } = await supabaseClient
       .from('smart_home_platforms')
       .select('*')
       .eq('user_id', user.id)
       .eq('platform_name', 'SmartThings')
       .eq('is_connected', true)
-      .order('created_at', { ascending: false })
-      .limit(1)
+      .single()
 
-    if (platformError || !platforms || platforms.length === 0) {
+    if (platformError || !platforms) {
       console.error('Platform error:', platformError)
       return new Response(
         JSON.stringify({ error: 'SmartThings platform not connected' }),
@@ -49,8 +49,7 @@ serve(async (req) => {
       )
     }
 
-    const platform = platforms[0] // Get the first (most recent) platform
-    const credentials = platform.credentials as { access_token?: string; api_key?: string; base_url?: string }
+    const credentials = platforms.credentials as { access_token?: string; api_key?: string; base_url?: string }
     const accessToken = credentials.access_token || credentials.api_key
     const baseUrl = credentials.base_url || 'https://api.smartthings.com/v1'
 
@@ -60,8 +59,6 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    console.log(`Using platform ${platform.id} with credentials for sync`)
 
     // First, fetch all locations and their rooms to create a lookup map
     console.log('Fetching locations and rooms...')
@@ -211,7 +208,7 @@ serve(async (req) => {
 
       const deviceData = {
         user_id: user.id,
-        platform_id: platform.id,
+        platform_id: platforms.id,
         device_id: device.deviceId,
         external_device_id: device.deviceId,
         device_name: deviceName,
@@ -240,14 +237,13 @@ serve(async (req) => {
     await supabaseClient
       .from('smart_home_platforms')
       .update({ last_sync: new Date().toISOString() })
-      .eq('id', platform.id)
+      .eq('id', platforms.id)
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         devices_synced: devices.length,
         rooms_found: roomLookup.size,
-        platform_used: platform.id,
         message: `Successfully synced ${devices.length} devices from SmartThings with ${roomLookup.size} rooms mapped`
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

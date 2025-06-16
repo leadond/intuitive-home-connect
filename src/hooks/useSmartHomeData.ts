@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -43,89 +43,10 @@ export const useSmartHomeData = () => {
   const [energyData, setEnergyData] = useState<EnergyData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
-  
-  // Use refs to track channels
-  const deviceChannelRef = useRef<any>(null);
-  const activityChannelRef = useRef<any>(null);
 
   useEffect(() => {
     fetchAllData();
-
-    // Clean up any existing channels first
-    if (deviceChannelRef.current) {
-      console.log('Cleaning up existing device channel');
-      supabase.removeChannel(deviceChannelRef.current);
-      deviceChannelRef.current = null;
-    }
-    if (activityChannelRef.current) {
-      console.log('Cleaning up existing activity channel');
-      supabase.removeChannel(activityChannelRef.current);
-      activityChannelRef.current = null;
-    }
-
-    console.log('Setting up real-time subscriptions...');
-    
-    // Set up real-time subscription for device status updates
-    deviceChannelRef.current = supabase
-      .channel(`device-status-updates-${Date.now()}-${Math.random()}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'smart_home_devices'
-        },
-        (payload) => {
-          console.log('Real-time device update received:', payload);
-          console.log('Updated device status:', payload.new.status);
-          
-          // Update the specific device in our local state
-          setDevices(prevDevices => {
-            const updatedDevices = prevDevices.map(device => 
-              device.id === payload.new.id 
-                ? { ...device, ...payload.new }
-                : device
-            );
-            console.log('Updated devices state:', updatedDevices);
-            return updatedDevices;
-          });
-        }
-      )
-      .subscribe();
-
-    // Set up real-time subscription for activity logs
-    activityChannelRef.current = supabase
-      .channel(`activity-updates-${Date.now()}-${Math.random()}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'device_activity_logs'
-        },
-        (payload) => {
-          console.log('New activity log received:', payload);
-          fetchActivityLogs(); // Refresh activity logs when new ones are added
-        }
-      )
-      .subscribe();
-
-    console.log('Real-time subscriptions set up successfully');
-
-    return () => {
-      // Clean up subscriptions on unmount
-      if (deviceChannelRef.current) {
-        console.log('Cleaning up device channel subscription');
-        supabase.removeChannel(deviceChannelRef.current);
-        deviceChannelRef.current = null;
-      }
-      if (activityChannelRef.current) {
-        console.log('Cleaning up activity channel subscription');
-        supabase.removeChannel(activityChannelRef.current);
-        activityChannelRef.current = null;
-      }
-    };
-  }, []); // Empty dependency array to ensure this only runs once
+  }, []);
 
   const fetchAllData = async () => {
     try {
@@ -149,19 +70,16 @@ export const useSmartHomeData = () => {
   };
 
   const fetchPlatforms = async () => {
-    console.log('Fetching platforms...');
     const { data, error } = await supabase
       .from('smart_home_platforms')
       .select('*')
       .order('platform_name');
 
     if (error) throw error;
-    console.log('Platforms fetched:', data);
     setPlatforms(data || []);
   };
 
   const fetchDevices = async () => {
-    console.log('Fetching devices...');
     const { data, error } = await supabase
       .from('smart_home_devices')
       .select(`
@@ -177,12 +95,10 @@ export const useSmartHomeData = () => {
       platform_name: device.smart_home_platforms?.platform_name || 'Unknown'
     })) || [];
     
-    console.log('Devices fetched:', devicesWithPlatform);
     setDevices(devicesWithPlatform);
   };
 
   const fetchActivityLogs = async () => {
-    console.log('Fetching activity logs...');
     const { data, error } = await supabase
       .from('device_activity_logs')
       .select(`
@@ -199,7 +115,6 @@ export const useSmartHomeData = () => {
       device_name: log.smart_home_devices?.device_name || 'Unknown Device'
     })) || [];
     
-    console.log('Activity logs fetched:', logsWithDeviceName);
     setActivityLogs(logsWithDeviceName);
   };
 
@@ -237,133 +152,7 @@ export const useSmartHomeData = () => {
     await fetchPlatforms();
   };
 
-  const disconnectPlatform = async (platformName: string) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      console.log(`=== Starting nuclear disconnect for platform: ${platformName} ===`);
-      
-      // Step 1: Delete ALL activity logs for this user (nuclear approach)
-      console.log('NUCLEAR: Deleting ALL activity logs for user...');
-      const { error: allLogsError } = await supabase
-        .from('device_activity_logs')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (allLogsError) {
-        console.error('Error deleting all activity logs:', allLogsError);
-      } else {
-        console.log('SUCCESS: Deleted all activity logs');
-      }
-
-      // Step 2: Delete ALL devices for this user (nuclear approach)
-      console.log('NUCLEAR: Deleting ALL devices for user...');
-      const { error: allDevicesError } = await supabase
-        .from('smart_home_devices')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (allDevicesError) {
-        console.error('Error deleting all devices:', allDevicesError);
-      } else {
-        console.log('SUCCESS: Deleted all devices');
-      }
-
-      // Step 3: Delete ALL platforms for this user (nuclear approach)
-      console.log('NUCLEAR: Deleting ALL platforms for user...');
-      const { error: allPlatformsError } = await supabase
-        .from('smart_home_platforms')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (allPlatformsError) {
-        console.error('Error deleting all platforms:', allPlatformsError);
-        throw allPlatformsError;
-      } else {
-        console.log('SUCCESS: Deleted all platforms');
-      }
-
-      console.log(`=== NUCLEAR DISCONNECT COMPLETE ===`);
-      
-      // Step 4: Clear all local state immediately
-      setPlatforms([]);
-      setDevices([]);
-      setActivityLogs([]);
-      
-      // Step 5: Refresh from database to confirm everything is clean
-      await fetchAllData();
-      
-      toast({
-        title: "Complete Reset",
-        description: `All smart home data has been completely removed. You can start fresh now.`,
-      });
-
-    } catch (error) {
-      console.error('Error in nuclear disconnect:', error);
-      toast({
-        title: "Reset Failed",
-        description: `Failed to reset data: ${error.message}`,
-        variant: "destructive"
-      });
-      throw error;
-    }
-  };
-
-  const removeDuplicatePlatforms = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      // Get all SmartThings platforms for this user
-      const { data: smartThingsPlatforms, error: fetchError } = await supabase
-        .from('smart_home_platforms')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('platform_name', 'SmartThings')
-        .order('created_at', { ascending: false });
-
-      if (fetchError) throw fetchError;
-
-      if (smartThingsPlatforms && smartThingsPlatforms.length > 1) {
-        // Keep the most recent one and remove the rest
-        const platformsToDelete = smartThingsPlatforms.slice(1);
-        
-        for (const platform of platformsToDelete) {
-          const { error: deleteError } = await supabase
-            .from('smart_home_platforms')
-            .delete()
-            .eq('id', platform.id);
-          
-          if (deleteError) {
-            console.error('Error deleting duplicate platform:', deleteError);
-          }
-        }
-
-        await fetchPlatforms();
-        
-        toast({
-          title: "Cleanup Complete",
-          description: `Removed ${platformsToDelete.length} duplicate SmartThings platform(s)`,
-        });
-      } else {
-        toast({
-          title: "No Duplicates Found",
-          description: "No duplicate platforms to remove",
-        });
-      }
-    } catch (error) {
-      console.error('Error removing duplicate platforms:', error);
-      toast({
-        title: "Cleanup Failed",
-        description: "Failed to remove duplicate platforms",
-        variant: "destructive"
-      });
-    }
-  };
-
   const updateDeviceStatus = async (deviceId: string, status: any) => {
-    console.log(`Updating device ${deviceId} status:`, status);
     const { error } = await supabase
       .from('smart_home_devices')
       .update({ 
@@ -372,11 +161,7 @@ export const useSmartHomeData = () => {
       })
       .eq('id', deviceId);
 
-    if (error) {
-      console.error('Error updating device status:', error);
-      throw error;
-    }
-    console.log('Device status updated successfully');
+    if (error) throw error;
     await fetchDevices();
   };
 
@@ -384,18 +169,26 @@ export const useSmartHomeData = () => {
     try {
       console.log(`Controlling device ${deviceId} with command ${command}:`, value);
       
+      // Find the device to get external_device_id
+      const device = devices.find(d => d.id === deviceId);
+      if (!device) {
+        throw new Error('Device not found');
+      }
+
+      // Use external_device_id if available, fallback to internal id
+      const externalDeviceId = device.external_device_id || deviceId;
+      
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('Not authenticated');
       }
 
-      console.log('Sending control request to edge function...');
       const response = await supabase.functions.invoke('control-smartthings-device', {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: {
-          deviceId: deviceId,
+          deviceId: externalDeviceId,
           command,
           value
         }
@@ -408,23 +201,18 @@ export const useSmartHomeData = () => {
 
       console.log('Device control response:', response.data);
       
-      // The real-time subscription will handle updating the UI
-      // But we can also update optimistically
-      if (response.data?.status) {
-        console.log('Updating device status optimistically:', response.data.status);
-        setDevices(prevDevices => 
-          prevDevices.map(device => 
-            device.id === deviceId 
-              ? { ...device, status: response.data.status }
-              : device
-          )
-        );
+      // Update local status optimistically
+      const newStatus = { ...device.status };
+      if (command === 'switch') {
+        newStatus.switch = value;
+      } else if (command === 'switchLevel') {
+        newStatus.level = value;
+        if (value > 0) newStatus.switch = 'on';
+      } else if (command === 'lock') {
+        newStatus.lock = value;
       }
       
-      toast({
-        title: "Device Updated",
-        description: response.data?.message || "Device controlled successfully",
-      });
+      await updateDeviceStatus(deviceId, newStatus);
       
       return response.data;
     } catch (error) {
@@ -500,11 +288,9 @@ export const useSmartHomeData = () => {
     isLoading,
     fetchAllData,
     addPlatform,
-    disconnectPlatform,
     updateDeviceStatus,
     controlDevice,
     logActivity,
-    syncSmartThingsDevices,
-    removeDuplicatePlatforms
+    syncSmartThingsDevices
   };
 };
