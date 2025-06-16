@@ -61,15 +61,28 @@ const getDeviceIcon = (deviceType: string, deviceName: string) => {
   return Power;
 };
 
-// Utility function to extract device status
-const getDeviceStatus = (device: SmartHomeDevice, deviceType: string) => {
-  if (!device.status) return { state: 'unknown', level: 0 };
-  
-  // For devices with switch capability
+// Updated function to extract device status from both stored and live data
+const getDeviceStatus = (device: SmartHomeDevice, deviceType: string, liveStatus?: any) => {
   let state = 'unknown';
   let level = 0;
+
+  // First, try to get status from live data if available
+  if (liveStatus && liveStatus.components && liveStatus.components.main) {
+    const mainComponent = liveStatus.components.main;
+    
+    // Check for switch state
+    if (mainComponent.switch && mainComponent.switch.switch && mainComponent.switch.switch.value) {
+      state = mainComponent.switch.switch.value;
+    }
+    
+    // Check for level (dimmer)
+    if (mainComponent.switchLevel && mainComponent.switchLevel.level && mainComponent.switchLevel.level.value !== undefined) {
+      level = mainComponent.switchLevel.level.value;
+    }
+  }
   
-  if (device.capabilities && Array.isArray(device.capabilities)) {
+  // Fallback to stored device capabilities if live data doesn't have what we need
+  if (state === 'unknown' && device.capabilities && Array.isArray(device.capabilities)) {
     for (const component of device.capabilities) {
       if (component && typeof component === 'object') {
         // Check for switch state
@@ -136,7 +149,8 @@ export const DeviceQuickActions = () => {
   // Handler function for toggling devices
   const handleToggleDevice = async (device: SmartHomeDevice) => {
     try {
-      const deviceStatus = getDeviceStatus(device, getDeviceTypeFromCapabilities(device.capabilities, device.device_type, device.device_name));
+      const liveStatus = liveStatuses[device.device_id];
+      const deviceStatus = getDeviceStatus(device, getDeviceTypeFromCapabilities(device.capabilities, device.device_type, device.device_name), liveStatus);
       const newState = deviceStatus.state === 'on' ? 'off' : 'on';
       
       await sendDeviceCommand(device.device_id, 'switch', newState);
@@ -265,11 +279,12 @@ export const DeviceQuickActions = () => {
                   {roomDevices.map((device) => {
                     const deviceType = getDeviceTypeFromCapabilities(device.capabilities, device.device_type, device.device_name);
                     const DeviceIcon = getDeviceIcon(deviceType, device.device_name);
-                    const deviceStatus = getDeviceStatus(device, deviceType);
+                    const liveStatus = liveStatuses[device.device_id];
+                    const deviceStatus = getDeviceStatus(device, deviceType, liveStatus);
                     const isDimmer = deviceType === 'dimmer';
                     const currentLevel = deviceStatus.level || 0;
                     
-                    console.log(`Rendering device ${device.device_name}:`, { deviceType, deviceStatus, currentLevel });
+                    console.log(`Rendering device ${device.device_name}:`, { deviceType, deviceStatus, currentLevel, liveStatus });
                     
                     return (
                       <div 
