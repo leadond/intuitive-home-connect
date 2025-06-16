@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,14 +9,17 @@ import {
   Lock, 
   Tv,
   Volume2,
-  Wifi
+  Wifi,
+  RefreshCw
 } from "lucide-react";
 import { useSmartHomeData } from "@/hooks/useSmartHomeData";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 export const DeviceQuickActions = () => {
-  const { devices, isLoading, updateDeviceStatus, logActivity } = useSmartHomeData();
+  const { devices, platforms, isLoading, updateDeviceStatus, logActivity, syncSmartThingsDevices } = useSmartHomeData();
   const { toast } = useToast();
+  const [syncing, setSyncing] = useState(false);
 
   const getDeviceIcon = (type: string) => {
     switch (type) {
@@ -100,6 +102,17 @@ export const DeviceQuickActions = () => {
     }
   };
 
+  const handleSyncDevices = async () => {
+    setSyncing(true);
+    try {
+      await syncSmartThingsDevices();
+    } catch (error) {
+      // Error is already handled in the hook
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   // Group devices by room
   const devicesByRoom = devices.reduce((acc, device) => {
     const room = device.room || 'Other';
@@ -109,6 +122,8 @@ export const DeviceQuickActions = () => {
     acc[room].push(device);
     return acc;
   }, {} as Record<string, typeof devices>);
+
+  const hasSmartThings = platforms.some(p => p.platform_name === 'SmartThings' && p.is_connected);
 
   if (isLoading) {
     return (
@@ -140,15 +155,42 @@ export const DeviceQuickActions = () => {
   return (
     <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-white">
       <CardHeader>
-        <CardTitle className="flex items-center">
-          <Wifi className="w-5 h-5 mr-2 text-blue-400" />
-          Device Quick Actions
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center">
+            <Wifi className="w-5 h-5 mr-2 text-blue-400" />
+            Device Quick Actions
+          </div>
+          {hasSmartThings && (
+            <Button 
+              size="sm"
+              onClick={handleSyncDevices}
+              disabled={syncing}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <RefreshCw className={`w-3 h-3 mr-1 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync'}
+            </Button>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
           {Object.keys(devicesByRoom).length === 0 ? (
-            <p className="text-blue-300 text-center py-4">No devices found. Connect your smart home platforms in the Admin panel.</p>
+            <div className="text-center py-8">
+              <p className="text-blue-300 mb-4">No devices found.</p>
+              {hasSmartThings ? (
+                <Button 
+                  onClick={handleSyncDevices}
+                  disabled={syncing}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                  {syncing ? 'Syncing Devices...' : 'Sync SmartThings Devices'}
+                </Button>
+              ) : (
+                <p className="text-blue-300 text-sm">Connect your smart home platforms in the Admin panel to see devices.</p>
+              )}
+            </div>
           ) : (
             Object.entries(devicesByRoom).map(([room, roomDevices]) => (
               <div key={room}>

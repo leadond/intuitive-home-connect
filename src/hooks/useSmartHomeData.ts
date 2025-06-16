@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -182,6 +181,43 @@ export const useSmartHomeData = () => {
     await fetchActivityLogs();
   };
 
+  const syncSmartThingsDevices = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await supabase.functions.invoke('fetch-smartthings-devices', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to sync SmartThings devices');
+      }
+
+      // Refresh devices after sync
+      await fetchDevices();
+      
+      toast({
+        title: "Sync Complete",
+        description: response.data?.message || "SmartThings devices synced successfully",
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Error syncing SmartThings devices:', error);
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync SmartThings devices",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   return {
     platforms,
     devices,
@@ -191,6 +227,7 @@ export const useSmartHomeData = () => {
     fetchAllData,
     addPlatform,
     updateDeviceStatus,
-    logActivity
+    logActivity,
+    syncSmartThingsDevices
   };
 };
