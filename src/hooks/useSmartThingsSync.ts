@@ -1,11 +1,106 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export const useSmartThingsSync = () => {
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isFetchingRooms, setIsFetchingRooms] = useState(false);
   const { toast } = useToast();
+
+  const fetchSmartThingsRooms = async () => {
+    try {
+      setIsFetchingRooms(true);
+      console.log('Fetching rooms from SmartThings API...');
+
+      // Get the current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Find the SmartThings platform
+      const { data: platforms, error: platformError } = await supabase
+        .from('smart_home_platforms')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('platform_name', 'SmartThings')
+        .eq('is_connected', true);
+
+      if (platformError) throw platformError;
+      
+      if (!platforms || platforms.length === 0) {
+        throw new Error('SmartThings platform not found or not connected');
+      }
+
+      const smartThingsPlatform = platforms[0];
+      const credentials = smartThingsPlatform.credentials as { api_key: string; base_url?: string };
+      
+      if (!credentials?.api_key) {
+        throw new Error('SmartThings API key not found');
+      }
+
+      // Fetch rooms from SmartThings API
+      const baseUrl = credentials.base_url || 'https://api.smartthings.com/v1';
+      const response = await fetch(`${baseUrl}/locations`, {
+        headers: {
+          'Authorization': `Bearer ${credentials.api_key}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`SmartThings API error: ${response.status} ${response.statusText}`);
+      }
+
+      const locationsData = await response.json();
+      console.log('SmartThings locations response:', locationsData);
+
+      if (!locationsData.items || !Array.isArray(locationsData.items)) {
+        throw new Error('Invalid response format from SmartThings API');
+      }
+
+      // For each location, fetch its rooms
+      const allRooms = [];
+      for (const location of locationsData.items) {
+        const roomsResponse = await fetch(`${baseUrl}/locations/${location.locationId}/rooms`, {
+          headers: {
+            'Authorization': `Bearer ${credentials.api_key}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (roomsResponse.ok) {
+          const roomsData = await roomsResponse.json();
+          if (roomsData.items && Array.isArray(roomsData.items)) {
+            allRooms.push(...roomsData.items.map(room => ({
+              id: room.roomId,
+              name: room.name,
+              locationId: location.locationId,
+              locationName: location.name
+            })));
+          }
+        }
+      }
+
+      console.log('Found rooms:', allRooms);
+
+      toast({
+        title: "Rooms Retrieved",
+        description: `Found ${allRooms.length} rooms from SmartThings.`,
+      });
+
+      return allRooms;
+
+    } catch (error) {
+      console.error('Error fetching SmartThings rooms:', error);
+      toast({
+        title: "Fetch Failed",
+        description: error instanceof Error ? error.message : "Failed to fetch SmartThings rooms",
+        variant: "destructive"
+      });
+      throw error;
+    } finally {
+      setIsFetchingRooms(false);
+    }
+  };
 
   const syncSmartThingsDevices = async () => {
     try {
@@ -136,6 +231,8 @@ export const useSmartThingsSync = () => {
 
   return {
     syncSmartThingsDevices,
-    isSyncing
+    isSyncing,
+    fetchSmartThingsRooms,
+    isFetchingRooms
   };
 };
