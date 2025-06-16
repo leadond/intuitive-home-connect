@@ -22,13 +22,14 @@ export const DeviceQuickActions = () => {
   const getRoomName = (roomId: string | null) => {
     if (!roomId) return 'Other';
     
-    // Common SmartThings room ID mappings - you can expand this based on your actual room IDs
+    // SmartThings room ID mappings - update these with your actual room IDs
     const roomMappings: Record<string, string> = {
       'fd2f09e3-063f-4d56-906f-c891312822e6': 'Master Bedroom',
-      // Add more room ID mappings as needed
+      'a5572f69-7130-4805-b4df-f174e19db38f': 'Living Room', // Add the room ID you mentioned
+      // Add more room ID mappings as needed - use the "Fetch Room Names" button to get the console output
     };
     
-    return roomMappings[roomId] || roomId; // Fallback to ID if no mapping found
+    return roomMappings[roomId] || `Room ${roomId.slice(0, 8)}`; // Show first 8 chars of ID if no mapping found
   };
 
   const getDeviceIcon = (type: string) => {
