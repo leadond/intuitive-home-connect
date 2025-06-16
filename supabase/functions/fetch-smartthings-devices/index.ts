@@ -49,14 +49,22 @@ serve(async (req) => {
       )
     }
 
-    const credentials = platforms.credentials as { api_key: string; base_url?: string }
+    const credentials = platforms.credentials as { access_token?: string; api_key?: string; base_url?: string }
+    const accessToken = credentials.access_token || credentials.api_key
     const baseUrl = credentials.base_url || 'https://api.smartthings.com/v1'
+
+    if (!accessToken) {
+      return new Response(
+        JSON.stringify({ error: 'SmartThings access token not found' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // First, fetch all locations and their rooms to create a lookup map
     console.log('Fetching locations and rooms...')
     const locationsResponse = await fetch(`${baseUrl}/locations`, {
       headers: {
-        'Authorization': `Bearer ${credentials.api_key}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       }
@@ -73,7 +81,7 @@ serve(async (req) => {
         try {
           const roomsResponse = await fetch(`${baseUrl}/locations/${location.locationId}/rooms`, {
             headers: {
-              'Authorization': `Bearer ${credentials.api_key}`,
+              'Authorization': `Bearer ${accessToken}`,
               'Accept': 'application/json',
               'Content-Type': 'application/json'
             }
@@ -100,7 +108,7 @@ serve(async (req) => {
     // Fetch devices from SmartThings API
     const devicesResponse = await fetch(`${baseUrl}/devices`, {
       headers: {
-        'Authorization': `Bearer ${credentials.api_key}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       }
@@ -127,7 +135,7 @@ serve(async (req) => {
       try {
         const statusResponse = await fetch(`${baseUrl}/devices/${device.deviceId}/status`, {
           headers: {
-            'Authorization': `Bearer ${credentials.api_key}`,
+            'Authorization': `Bearer ${accessToken}`,
             'Accept': 'application/json',
             'Content-Type': 'application/json'
           }
@@ -135,9 +143,32 @@ serve(async (req) => {
         
         if (statusResponse.ok) {
           const statusData = await statusResponse.json()
-          // Extract main component status
-          if (statusData.components && statusData.components.main) {
-            deviceStatus = statusData.components.main
+          console.log(`Device ${device.deviceId} status:`, statusData)
+          
+          // Extract status from SmartThings format and normalize it
+          if (statusData.components?.main) {
+            const mainComponent = statusData.components.main
+            deviceStatus = {
+              switch: mainComponent.switch?.switch?.value,
+              level: mainComponent.switchLevel?.level?.value,
+              lock: mainComponent.lock?.lock?.value,
+              temperature: mainComponent.temperatureMeasurement?.temperature?.value,
+              thermostatSetpoint: mainComponent.thermostatHeatingSetpoint?.heatingSetpoint?.value,
+              thermostatMode: mainComponent.thermostat?.thermostatMode?.value,
+              battery: mainComponent.battery?.battery?.value,
+              contact: mainComponent.contactSensor?.contact?.value,
+              motion: mainComponent.motionSensor?.motion?.value,
+              illuminance: mainComponent.illuminanceMeasurement?.illuminance?.value,
+              volume: mainComponent.audioVolume?.volume?.value,
+              mute: mainComponent.audioMute?.mute?.value
+            }
+            
+            // Remove undefined values
+            Object.keys(deviceStatus).forEach(key => {
+              if (deviceStatus[key] === undefined) {
+                delete deviceStatus[key]
+              }
+            })
           }
         }
       } catch (statusError) {
@@ -179,6 +210,7 @@ serve(async (req) => {
         user_id: user.id,
         platform_id: platforms.id,
         device_id: device.deviceId,
+        external_device_id: device.deviceId,
         device_name: deviceName,
         device_type: deviceType,
         room: roomName,
@@ -196,6 +228,8 @@ serve(async (req) => {
 
       if (upsertError) {
         console.error('Error upserting device:', upsertError)
+      } else {
+        console.log(`Successfully synced device: ${deviceName}`)
       }
     }
 

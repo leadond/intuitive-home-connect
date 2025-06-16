@@ -27,7 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 
 export const DeviceQuickActions = () => {
-  const { devices, platforms, isLoading, updateDeviceStatus, logActivity, syncSmartThingsDevices } = useSmartHomeData();
+  const { devices, platforms, isLoading, updateDeviceStatus, controlDevice, logActivity, syncSmartThingsDevices } = useSmartHomeData();
   const { toast } = useToast();
   const [syncing, setSyncing] = useState(false);
   const [controllingDevices, setControllingDevices] = useState<Set<string>>(new Set());
