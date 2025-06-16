@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -43,60 +43,83 @@ export const useSmartHomeData = () => {
   const [energyData, setEnergyData] = useState<EnergyData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  
+  // Use refs to track if channels are already subscribed
+  const deviceChannelRef = useRef<any>(null);
+  const activityChannelRef = useRef<any>(null);
+  const isSubscribedRef = useRef(false);
 
   useEffect(() => {
     fetchAllData();
 
-    // Set up real-time subscription for device status updates
-    const deviceChannel = supabase
-      .channel('device-status-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'smart_home_devices'
-        },
-        (payload) => {
-          console.log('Real-time device update received:', payload);
-          console.log('Updated device status:', payload.new.status);
-          
-          // Update the specific device in our local state
-          setDevices(prevDevices => {
-            const updatedDevices = prevDevices.map(device => 
-              device.id === payload.new.id 
-                ? { ...device, ...payload.new }
-                : device
-            );
-            console.log('Updated devices state:', updatedDevices);
-            return updatedDevices;
-          });
-        }
-      )
-      .subscribe();
+    // Only set up subscriptions if not already subscribed
+    if (!isSubscribedRef.current) {
+      console.log('Setting up real-time subscriptions...');
+      
+      // Set up real-time subscription for device status updates
+      deviceChannelRef.current = supabase
+        .channel('device-status-updates-' + Date.now()) // Add timestamp to make channel unique
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'smart_home_devices'
+          },
+          (payload) => {
+            console.log('Real-time device update received:', payload);
+            console.log('Updated device status:', payload.new.status);
+            
+            // Update the specific device in our local state
+            setDevices(prevDevices => {
+              const updatedDevices = prevDevices.map(device => 
+                device.id === payload.new.id 
+                  ? { ...device, ...payload.new }
+                  : device
+              );
+              console.log('Updated devices state:', updatedDevices);
+              return updatedDevices;
+            });
+          }
+        )
+        .subscribe();
 
-    // Set up real-time subscription for activity logs
-    const activityChannel = supabase
-      .channel('activity-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'device_activity_logs'
-        },
-        (payload) => {
-          console.log('New activity log received:', payload);
-          fetchActivityLogs(); // Refresh activity logs when new ones are added
-        }
-      )
-      .subscribe();
+      // Set up real-time subscription for activity logs
+      activityChannelRef.current = supabase
+        .channel('activity-updates-' + Date.now()) // Add timestamp to make channel unique
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'device_activity_logs'
+          },
+          (payload) => {
+            console.log('New activity log received:', payload);
+            fetchActivityLogs(); // Refresh activity logs when new ones are added
+          }
+        )
+        .subscribe();
+
+      isSubscribedRef.current = true;
+      console.log('Real-time subscriptions set up successfully');
+    }
 
     return () => {
-      supabase.removeChannel(deviceChannel);
-      supabase.removeChannel(activityChannel);
+      // Clean up subscriptions on unmount
+      if (deviceChannelRef.current) {
+        console.log('Cleaning up device channel subscription');
+        supabase.removeChannel(deviceChannelRef.current);
+        deviceChannelRef.current = null;
+      }
+      if (activityChannelRef.current) {
+        console.log('Cleaning up activity channel subscription');
+        supabase.removeChannel(activityChannelRef.current);
+        activityChannelRef.current = null;
+      }
+      isSubscribedRef.current = false;
     };
-  }, []);
+  }, []); // Empty dependency array to ensure this only runs once
 
   const fetchAllData = async () => {
     try {
