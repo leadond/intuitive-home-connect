@@ -242,87 +242,47 @@ export const useSmartHomeData = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      console.log(`=== Starting disconnect process for platform: ${platformName} ===`);
-      console.log('Current platforms before disconnect:', platforms);
-
-      // Step 1: Get all platforms with this name for this user
-      const { data: platformsToDelete, error: fetchError } = await supabase
+      console.log(`=== Starting complete disconnect for platform: ${platformName} ===`);
+      
+      // Step 1: Force delete ALL SmartThings platforms regardless of connection
+      const { error: deleteError } = await supabase
         .from('smart_home_platforms')
-        .select('*')
+        .delete()
         .eq('user_id', user.id)
         .eq('platform_name', platformName);
 
-      if (fetchError) {
-        console.error('Error fetching platforms to delete:', fetchError);
-        throw fetchError;
+      if (deleteError) {
+        console.error('Error deleting platforms:', deleteError);
+        throw deleteError;
       }
 
-      console.log(`Found ${platformsToDelete?.length || 0} platforms to delete:`, platformsToDelete);
+      // Step 2: Force delete ALL devices for SmartThings platforms
+      const { error: devicesError } = await supabase
+        .from('smart_home_devices')
+        .delete()
+        .eq('user_id', user.id);
 
-      if (!platformsToDelete || platformsToDelete.length === 0) {
-        console.log('No platforms found to disconnect');
-        toast({
-          title: "No Platforms Found",
-          description: `No ${platformName} platforms found to disconnect`,
-        });
-        return;
+      if (devicesError) {
+        console.error('Error deleting devices:', devicesError);
       }
 
-      // Step 2: Delete each platform and its associated data
-      for (const platform of platformsToDelete) {
-        console.log(`Deleting platform ${platform.id}...`);
-
-        // Delete devices for this specific platform
-        const { error: devicesError } = await supabase
-          .from('smart_home_devices')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('platform_id', platform.id);
-
-        if (devicesError) {
-          console.error(`Error deleting devices for platform ${platform.id}:`, devicesError);
-        } else {
-          console.log(`Deleted devices for platform ${platform.id}`);
-        }
-
-        // Delete the platform itself
-        const { error: platformError } = await supabase
-          .from('smart_home_platforms')
-          .delete()
-          .eq('id', platform.id)
-          .eq('user_id', user.id);
-
-        if (platformError) {
-          console.error(`Error deleting platform ${platform.id}:`, platformError);
-          throw platformError;
-        } else {
-          console.log(`Successfully deleted platform ${platform.id}`);
-        }
-      }
-
-      console.log(`=== Completed deletion of all ${platformName} platforms ===`);
+      console.log(`Successfully force-deleted all ${platformName} data`);
       
-      // Step 3: Immediately update local state
-      console.log('Updating local state...');
+      // Step 3: Immediately clear local state
       setPlatforms(prevPlatforms => {
         const filtered = prevPlatforms.filter(p => p.platform_name !== platformName);
-        console.log('Platforms after filter:', filtered);
+        console.log('Platforms after immediate filter:', filtered);
         return filtered;
       });
       
-      setDevices(prevDevices => {
-        const filtered = prevDevices.filter(d => d.platform_name !== platformName);
-        console.log('Devices after filter:', filtered);
-        return filtered;
-      });
-
-      // Step 4: Force a fresh fetch to ensure consistency
-      console.log('Forcing fresh data fetch...');
+      setDevices([]);  // Clear all devices for fresh start
+      
+      // Step 4: Force refresh from database
       await fetchAllData();
       
       toast({
         title: "Platform Disconnected",
-        description: `All ${platformName} platforms have been completely removed.`,
+        description: `All ${platformName} connections and devices have been completely removed.`,
       });
 
     } catch (error) {
