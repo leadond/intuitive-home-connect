@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -46,6 +47,52 @@ export const useSmartHomeData = () => {
 
   useEffect(() => {
     fetchAllData();
+
+    // Set up real-time subscription for device status updates
+    const deviceChannel = supabase
+      .channel('device-status-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'smart_home_devices'
+        },
+        (payload) => {
+          console.log('Real-time device update:', payload);
+          // Update the specific device in our local state
+          setDevices(prevDevices => 
+            prevDevices.map(device => 
+              device.id === payload.new.id 
+                ? { ...device, ...payload.new }
+                : device
+            )
+          );
+        }
+      )
+      .subscribe();
+
+    // Set up real-time subscription for activity logs
+    const activityChannel = supabase
+      .channel('activity-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'device_activity_logs'
+        },
+        (payload) => {
+          console.log('New activity log:', payload);
+          fetchActivityLogs(); // Refresh activity logs when new ones are added
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(deviceChannel);
+      supabase.removeChannel(activityChannel);
+    };
   }, []);
 
   const fetchAllData = async () => {
@@ -179,7 +226,7 @@ export const useSmartHomeData = () => {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: {
-          deviceId: deviceId, // Use the internal database ID directly
+          deviceId: deviceId,
           command,
           value
         }
@@ -192,8 +239,22 @@ export const useSmartHomeData = () => {
 
       console.log('Device control response:', response.data);
       
-      // Refresh devices to get updated status
-      await fetchDevices();
+      // The real-time subscription will handle updating the UI
+      // But we can also update optimistically
+      if (response.data?.status) {
+        setDevices(prevDevices => 
+          prevDevices.map(device => 
+            device.id === deviceId 
+              ? { ...device, status: response.data.status }
+              : device
+          )
+        );
+      }
+      
+      toast({
+        title: "Device Updated",
+        description: response.data?.message || "Device controlled successfully",
+      });
       
       return response.data;
     } catch (error) {

@@ -35,23 +35,42 @@ serve(async (req) => {
     const { deviceId, command, value } = await req.json()
 
     console.log(`Controlling device ${deviceId} with command ${command}:`, value)
+    console.log(`User ID: ${user.id}`)
 
-    // Get the device details from our database
-    const { data: device, error: deviceError } = await supabaseClient
+    // Get the device details from our database - try both with and without user_id filter
+    let { data: device, error: deviceError } = await supabaseClient
       .from('smart_home_devices')
       .select(`
         *,
         smart_home_platforms(*)
       `)
       .eq('id', deviceId)
-      .eq('user_id', user.id)
       .single()
 
+    // If not found, log more details for debugging
     if (deviceError || !device) {
-      console.error('Device not found:', deviceError)
+      console.error('Device lookup error:', deviceError)
+      
+      // Try to find device without user filter to see if it exists
+      const { data: allDevices } = await supabaseClient
+        .from('smart_home_devices')
+        .select('id, user_id, device_name')
+        .eq('id', deviceId)
+      
+      console.log('Device search results:', allDevices)
+      
       return new Response(
-        JSON.stringify({ error: 'Device not found' }),
+        JSON.stringify({ error: 'Device not found or access denied', details: deviceError?.message }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Verify user owns this device
+    if (device.user_id !== user.id) {
+      console.error(`User ${user.id} does not own device ${deviceId} (owned by ${device.user_id})`)
+      return new Response(
+        JSON.stringify({ error: 'Device access denied' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
