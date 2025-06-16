@@ -237,6 +237,54 @@ export const useSmartHomeData = () => {
     await fetchPlatforms();
   };
 
+  const disconnectPlatform = async (platformName: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // First, delete all devices associated with platforms of this name
+      const { error: devicesError } = await supabase
+        .from('smart_home_devices')
+        .delete()
+        .eq('user_id', user.id)
+        .in('platform_id', 
+          supabase
+            .from('smart_home_platforms')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('platform_name', platformName)
+        );
+
+      if (devicesError) {
+        console.error('Error deleting devices:', devicesError);
+      }
+
+      // Then delete all platforms with this name for the user
+      const { error: platformError } = await supabase
+        .from('smart_home_platforms')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('platform_name', platformName);
+
+      if (platformError) throw platformError;
+
+      await fetchAllData(); // Refresh all data
+      
+      toast({
+        title: "Platform Disconnected",
+        description: `All ${platformName} platforms and devices have been removed.`,
+      });
+    } catch (error) {
+      console.error('Error disconnecting platform:', error);
+      toast({
+        title: "Disconnect Failed",
+        description: "Failed to disconnect platform",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   const removeDuplicatePlatforms = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -427,6 +475,7 @@ export const useSmartHomeData = () => {
     isLoading,
     fetchAllData,
     addPlatform,
+    disconnectPlatform,
     updateDeviceStatus,
     controlDevice,
     logActivity,

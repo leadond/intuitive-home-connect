@@ -25,7 +25,7 @@ import { ClearPlatformData } from "@/components/ClearPlatformData";
 
 const Admin = () => {
   const { toast } = useToast();
-  const { platforms, addPlatform, syncSmartThingsDevices, removeDuplicatePlatforms, isLoading } = useSmartHomeData();
+  const { platforms, addPlatform, syncSmartThingsDevices, removeDuplicatePlatforms, disconnectPlatform, isLoading } = useSmartHomeData();
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
@@ -194,11 +194,12 @@ const Admin = () => {
     }
   };
 
-  const handleDisconnect = (platformName: string) => {
-    toast({
-      title: "Platform Disconnected",
-      description: `${platformName} has been disconnected successfully.`,
-    });
+  const handleDisconnect = async (platformName: string) => {
+    try {
+      await disconnectPlatform(platformName);
+    } catch (error) {
+      // Error is already handled in the hook
+    }
   };
 
   const handleSyncSmartThings = async () => {
