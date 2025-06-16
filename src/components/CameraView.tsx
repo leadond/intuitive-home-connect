@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +14,7 @@ import {
   Moon,
   Sun,
   Eye,
-  Record,
+  Circle,
   Image as ImageIcon
 } from "lucide-react";
 import { SmartHomeDevice } from "@/hooks/useSmartHomeData";
