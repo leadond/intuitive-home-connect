@@ -17,7 +17,8 @@ import {
   Monitor,
   Home,
   Lamp,
-  RefreshCw
+  RefreshCw,
+  Activity
 } from "lucide-react";
 import { useSmartHomeData, SmartHomeDevice } from "@/hooks/useSmartHomeData";
 import { useSmartThingsStatus } from "@/hooks/useSmartThingsStatus";
@@ -31,13 +32,19 @@ const getDeviceTypeFromCapabilities = (capabilities: any, deviceType: string, de
   
   const name = deviceName.toLowerCase();
 
-  // Check for thermostat capabilities first - look for thermostat-specific capabilities
+  // Check for sensor capabilities first
   for (const component of capabilities) {
     if (component && component.capabilities && Array.isArray(component.capabilities)) {
       const hasCapability = (capName: string) => 
         component.capabilities.some((cap: any) => 
           cap && cap.id && cap.id.toLowerCase().includes(capName.toLowerCase())
         );
+
+      // Check for presence sensor (Aqara FP2 and similar)
+      if (hasCapability('presenceSensor') || hasCapability('motionSensor') || hasCapability('illuminanceMeasurement')) {
+        console.log(`Device ${deviceName} identified as sensor based on capabilities`);
+        return 'sensor';
+      }
 
       // Check for thermostat capabilities
       if (hasCapability('thermostat') || 
@@ -81,6 +88,7 @@ const getDeviceTypeFromCapabilities = (capabilities: any, deviceType: string, de
 const getDeviceIcon = (deviceType: string, deviceName: string) => {
   const name = deviceName.toLowerCase();
   
+  if (deviceType === 'sensor' || name.includes('sensor') || name.includes('aqara')) return Activity;
   if (deviceType === 'dimmer' || name.includes('light') || name.includes('lamp')) return Lightbulb;
   if (deviceType === 'fan' || name.includes('fan')) return Fan;
   if (deviceType === 'thermostat' || name.includes('thermostat')) return Thermometer;
@@ -102,6 +110,9 @@ const getDeviceStatus = (device: SmartHomeDevice, deviceType: string, liveStatus
   let heatingSetpoint = null;
   let coolingSetpoint = null;
   let thermostatMode = 'off';
+  let presence = null;
+  let motion = null;
+  let illuminance = null;
 
   console.log(`Getting status for device ${device.device_name}:`, { 
     deviceType, 
@@ -115,6 +126,24 @@ const getDeviceStatus = (device: SmartHomeDevice, deviceType: string, liveStatus
     const mainComponent = liveStatus.components.main;
     
     console.log(`Live status main component for ${device.device_name}:`, mainComponent);
+    
+    // Check for sensor data
+    if (deviceType === 'sensor') {
+      if (mainComponent.presenceSensor && mainComponent.presenceSensor.presence && mainComponent.presenceSensor.presence.value !== undefined) {
+        presence = mainComponent.presenceSensor.presence.value;
+        console.log(`Found presence status: ${presence}`);
+      }
+      
+      if (mainComponent.motionSensor && mainComponent.motionSensor.motion && mainComponent.motionSensor.motion.value !== undefined) {
+        motion = mainComponent.motionSensor.motion.value;
+        console.log(`Found motion status: ${motion}`);
+      }
+      
+      if (mainComponent.illuminanceMeasurement && mainComponent.illuminanceMeasurement.illuminance && mainComponent.illuminanceMeasurement.illuminance.value !== undefined) {
+        illuminance = mainComponent.illuminanceMeasurement.illuminance.value;
+        console.log(`Found illuminance: ${illuminance}`);
+      }
+    }
     
     // Check for switch state
     if (mainComponent.switch && mainComponent.switch.switch && mainComponent.switch.switch.value) {
@@ -197,13 +226,31 @@ const getDeviceStatus = (device: SmartHomeDevice, deviceType: string, liveStatus
     }
   }
   
-  const result = { state, level, fanSpeed, temperature, heatingSetpoint, coolingSetpoint, thermostatMode };
+  const result = { state, level, fanSpeed, temperature, heatingSetpoint, coolingSetpoint, thermostatMode, presence, motion, illuminance };
   console.log(`Final status for ${device.device_name}:`, result);
   return result;
 };
 
 // Updated utility function to get status text
 const getStatusText = (deviceStatus: any, deviceType: string): string => {
+  if (deviceType === 'sensor') {
+    const statusParts = [];
+    
+    if (deviceStatus.presence !== null) {
+      statusParts.push(deviceStatus.presence === 'present' ? 'Present' : 'Not Present');
+    }
+    
+    if (deviceStatus.motion !== null) {
+      statusParts.push(deviceStatus.motion === 'active' ? 'Motion' : 'No Motion');
+    }
+    
+    if (deviceStatus.illuminance !== null) {
+      statusParts.push(`${deviceStatus.illuminance} lux`);
+    }
+    
+    return statusParts.length > 0 ? statusParts.join(' • ') : 'No Data';
+  }
+  
   if (deviceType === 'thermostat') {
     const mode = deviceStatus.thermostatMode || 'off';
     const temp = deviceStatus.temperature;
@@ -239,6 +286,13 @@ const getStatusText = (deviceStatus: any, deviceType: string): string => {
 
 // Utility function to get status color for badges
 const getStatusColor = (deviceStatus: any, deviceType: string): string => {
+  if (deviceType === 'sensor') {
+    if (deviceStatus.presence === 'present' || deviceStatus.motion === 'active') {
+      return 'bg-green-600 hover:bg-green-700';
+    }
+    return 'bg-blue-600 hover:bg-blue-700';
+  }
+  
   if (deviceType === 'thermostat') {
     const mode = deviceStatus.thermostatMode || 'off';
     if (mode === 'heat') return 'bg-orange-600 hover:bg-orange-700';
@@ -548,10 +602,11 @@ export const DeviceQuickActions = () => {
                       const isDimmer = deviceType === 'dimmer';
                       const isFan = deviceType === 'fan';
                       const isThermostat = deviceType === 'thermostat';
+                      const isSensor = deviceType === 'sensor';
                       const currentLevel = deviceStatus.level || 0;
                       const currentFanSpeed = deviceStatus.fanSpeed || 0;
                       
-                      console.log(`Rendering device ${device.device_name}:`, { deviceType, deviceStatus, isThermostat });
+                      console.log(`Rendering device ${device.device_name}:`, { deviceType, deviceStatus, isThermostat, isSensor });
                       
                       return (
                         <div 
@@ -575,7 +630,36 @@ export const DeviceQuickActions = () => {
                             </div>
                           </div>
                           
-                          {isThermostat ? (
+                          {isSensor ? (
+                            <div className="space-y-2">
+                              <div className="text-sm text-blue-200">
+                                <div className="grid grid-cols-1 gap-1">
+                                  {deviceStatus.presence !== null && (
+                                    <div className="flex justify-between">
+                                      <span>Presence:</span>
+                                      <span className="text-white">
+                                        {deviceStatus.presence === 'present' ? 'Present' : 'Not Present'}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {deviceStatus.motion !== null && (
+                                    <div className="flex justify-between">
+                                      <span>Motion:</span>
+                                      <span className="text-white">
+                                        {deviceStatus.motion === 'active' ? 'Active' : 'Inactive'}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {deviceStatus.illuminance !== null && (
+                                    <div className="flex justify-between">
+                                      <span>Illuminance:</span>
+                                      <span className="text-white">{deviceStatus.illuminance} lux</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ) : isThermostat ? (
                             <div className="flex justify-center">
                               <Button 
                                 size="sm" 
