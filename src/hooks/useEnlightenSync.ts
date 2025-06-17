@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -40,6 +39,11 @@ export interface EnlightenStats {
   }>;
 }
 
+interface EnlightenCredentials {
+  api_key: string;
+  system_id: string;
+}
+
 export const useEnlightenSync = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [devices, setDevices] = useState<EnlightenDevice[]>([]);
@@ -63,14 +67,14 @@ export const useEnlightenSync = () => {
         throw new Error('Failed to get platform credentials');
       }
 
-      const { api_key, system_id } = platform.credentials;
-      if (!api_key || !system_id) {
+      const credentials = platform.credentials as EnlightenCredentials;
+      if (!credentials.api_key || !credentials.system_id) {
         throw new Error('Missing API key or system ID');
       }
 
       // Simulate API calls (in real implementation, these would be actual API calls)
       // Note: Actual Enlighten API requires server-side implementation due to CORS
-      await simulateEnlightenSync(platformId, api_key, system_id);
+      await simulateEnlightenSync(platformId, credentials.api_key, credentials.system_id);
 
       toast({
         title: "Enlighten Sync Complete",
