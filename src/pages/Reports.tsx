@@ -88,7 +88,7 @@ const Reports = () => {
     if (!platforms.length) return [];
     
     return platforms.map(platform => {
-      const platformDevices = devices.filter(d => d.platform_id === platform.id);
+      const platformDevices = devices.filter(d => d.platform_name === platform.platform_name);
       const activeDevices = platformDevices.filter(d => 
         d.status?.state === 'on' || d.status?.online !== false
       );
