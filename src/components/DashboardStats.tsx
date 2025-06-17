@@ -27,17 +27,103 @@ export const DashboardStats = () => {
     );
   }
 
-  const lightDevices = devices.filter(d => d.device_type === 'light');
-  const climateDevices = devices.filter(d => d.device_type === 'thermostat');
-  const securityDevices = devices.filter(d => d.device_type === 'security');
-  const cameraDevices = devices.filter(d => d.device_type === 'camera');
-  const lockDevices = devices.filter(d => d.device_type === 'lock');
+  // Helper function to identify device types based on capabilities and name
+  const getDeviceType = (device: any) => {
+    const name = device.device_name?.toLowerCase() || '';
+    const deviceType = device.device_type?.toLowerCase() || '';
+    
+    // Check for camera devices
+    if (deviceType === 'camera_view' || name.includes('camera') || device.capabilities?.ptz_commands) {
+      return 'camera';
+    }
+    
+    // Check for thermostat devices
+    if (deviceType === 'thermostat' || name.includes('thermostat') || 
+        (device.capabilities && Array.isArray(device.capabilities) && 
+         device.capabilities.some((cap: any) => 
+           cap?.capabilities?.some((c: any) => c?.id?.includes('thermostat'))))) {
+      return 'thermostat';
+    }
+    
+    // Check for light/dimmer devices
+    if (name.includes('light') || name.includes('lamp') || name.includes('dimmer') ||
+        (device.capabilities && Array.isArray(device.capabilities) && 
+         device.capabilities.some((cap: any) => 
+           cap?.capabilities?.some((c: any) => c?.id?.includes('switchLevel'))))) {
+      return 'light';
+    }
+    
+    // Check for fan devices
+    if (name.includes('fan') && !name.includes('light')) {
+      return 'fan';
+    }
+    
+    // Check for lock devices
+    if (name.includes('lock') || deviceType === 'lock') {
+      return 'lock';
+    }
+    
+    // Check for security/sensor devices
+    if (name.includes('sensor') || name.includes('door') || name.includes('motion') || 
+        deviceType === 'binary_sensor' || device.capabilities?.zone_number) {
+      return 'security';
+    }
+    
+    return 'other';
+  };
 
-  const lightsOn = lightDevices.filter(d => d.status?.state === 'on').length;
-  const currentTemp = climateDevices[0]?.status?.temperature || 'N/A';
-  const securityArmed = securityDevices.some(d => d.status?.armed);
-  const camerasRecording = cameraDevices.filter(d => d.status?.recording).length;
-  const locksSecured = lockDevices.filter(d => d.status?.locked).length;
+  // Categorize devices
+  const deviceCategories = devices.reduce((acc, device) => {
+    const type = getDeviceType(device);
+    if (!acc[type]) acc[type] = [];
+    acc[type].push(device);
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  // Count devices on/active
+  const lightDevices = deviceCategories.light || [];
+  const thermostatDevices = deviceCategories.thermostat || [];
+  const securityDevices = deviceCategories.security || [];
+  const cameraDevices = deviceCategories.camera || [];
+  const lockDevices = deviceCategories.lock || [];
+  const fanDevices = deviceCategories.fan || [];
+
+  // Get lights that are on
+  const lightsOn = lightDevices.filter(device => {
+    if (device.capabilities && Array.isArray(device.capabilities)) {
+      return device.capabilities.some((cap: any) => 
+        cap?.switch?.switch?.value === 'on'
+      );
+    }
+    return device.status?.state === 'on';
+  }).length;
+
+  // Get current temperature from first thermostat
+  const currentTemp = thermostatDevices.length > 0 ? 
+    (thermostatDevices[0].capabilities?.[0]?.temperatureMeasurement?.temperature?.value || 
+     thermostatDevices[0].status?.temperature || 'N/A') : 'N/A';
+
+  // Check if any security devices are armed/active
+  const securityArmed = securityDevices.some(device => 
+    device.status?.armed || device.status?.state === 'active'
+  );
+
+  // Count cameras that are recording
+  const camerasRecording = cameraDevices.filter(device => 
+    device.status?.recording === 'enabled'
+  ).length;
+
+  // Count locks that are secured
+  const locksSecured = lockDevices.filter(device => 
+    device.status?.locked || device.status?.state === 'locked'
+  ).length;
+
+  // Calculate total energy usage (simplified calculation)
+  const totalDevices = devices.length;
+  const activeDevices = devices.filter(device => 
+    device.status?.state === 'on' || device.status?.online !== false
+  ).length;
+  const estimatedUsage = (activeDevices * 0.1).toFixed(1); // Rough estimate
 
   const stats = [
     {
@@ -50,8 +136,8 @@ export const DashboardStats = () => {
     },
     {
       title: "Climate Control",
-      value: typeof currentTemp === 'number' ? `${currentTemp}°F` : currentTemp,
-      subtitle: climateDevices[0]?.status?.mode || "No devices",
+      value: typeof currentTemp === 'number' ? `${currentTemp}°F` : currentTemp.toString(),
+      subtitle: thermostatDevices.length > 0 ? `${thermostatDevices.length} thermostat${thermostatDevices.length !== 1 ? 's' : ''}` : "No devices",
       icon: Thermometer,
       color: "text-blue-400",
       bgColor: "bg-blue-400/20"
@@ -59,7 +145,7 @@ export const DashboardStats = () => {
     {
       title: "Security",
       value: securityArmed ? "Armed" : "Disarmed",
-      subtitle: `${securityDevices.length} sensors`,
+      subtitle: `${securityDevices.length} sensor${securityDevices.length !== 1 ? 's' : ''}`,
       icon: Shield,
       color: securityArmed ? "text-green-400" : "text-red-400",
       bgColor: securityArmed ? "bg-green-400/20" : "bg-red-400/20"
@@ -82,8 +168,8 @@ export const DashboardStats = () => {
     },
     {
       title: "Energy Usage",
-      value: "2.4kW",
-      subtitle: "Current usage",
+      value: `${estimatedUsage}kW`,
+      subtitle: `${activeDevices}/${totalDevices} devices active`,
       icon: Zap,
       color: "text-orange-400",
       bgColor: "bg-orange-400/20"

@@ -19,7 +19,8 @@ import {
   Image as ImageIcon,
   Maximize,
   Settings,
-  RefreshCw
+  RefreshCw,
+  AlertTriangle
 } from "lucide-react";
 import { SmartHomeDevice } from "@/hooks/useSmartHomeData";
 import { useToast } from "@/hooks/use-toast";
@@ -64,12 +65,12 @@ export const CameraView = ({
   // For ReoLink cameras, assume they're online if they have an IP address
   const isOnline = deviceStatus.online !== false && !!deviceStatus.ip_address;
 
-  // Auto-refresh the image every 5 seconds
+  // Auto-refresh the image every 10 seconds instead of 5 to reduce load
   useEffect(() => {
     if (isOnline && !imageError) {
       const interval = setInterval(() => {
         setImageKey(prev => prev + 1);
-      }, 5000);
+      }, 10000);
       return () => clearInterval(interval);
     }
   }, [isOnline, imageError]);
@@ -78,22 +79,16 @@ export const CameraView = ({
     try {
       console.log(`Sending PTZ command: ${command}`);
       
-      // Get the command URL from capabilities
-      const commandUrl = capabilities.ptz_commands?.[command];
-      if (!commandUrl) {
-        throw new Error(`PTZ command ${command} not found`);
-      }
-
-      // Make direct HTTP request to camera
-      const response = await fetch(commandUrl, {
-        method: 'GET',
-        mode: 'no-cors' // This will prevent CORS issues but we won't get response data
-      });
-
+      // Show immediate feedback
       toast({
         title: "PTZ Command Sent",
-        description: `Camera ${command} command executed`,
+        description: `Executing ${command} command...`,
       });
+
+      // Since we can't make direct HTTP requests due to CORS, we'll just log the action
+      // In a real implementation, this would go through a backend proxy
+      await onPtzCommand(device, command);
+      
     } catch (error) {
       console.error('PTZ command error:', error);
       toast({
@@ -111,15 +106,7 @@ export const CameraView = ({
     try {
       console.log(`Changing night vision from ${currentMode} to ${nextMode}`);
       
-      const commandUrl = capabilities.night_vision_commands?.[nextMode];
-      if (!commandUrl) {
-        throw new Error(`Night vision command ${nextMode} not found`);
-      }
-
-      const response = await fetch(commandUrl, {
-        method: 'GET',
-        mode: 'no-cors'
-      });
+      await onNightVisionToggle(device, nextMode);
 
       toast({
         title: "Night Vision Updated",
@@ -153,12 +140,6 @@ export const CameraView = ({
     setImageKey(prev => prev + 1);
   };
 
-  const openSnapshotUrl = () => {
-    if (deviceStatus.http_snapshot) {
-      window.open(`${deviceStatus.http_snapshot}&t=${Date.now()}`, '_blank');
-    }
-  };
-
   const openStreamUrl = () => {
     if (deviceStatus.rtsp_main) {
       navigator.clipboard.writeText(deviceStatus.rtsp_main);
@@ -169,9 +150,17 @@ export const CameraView = ({
     }
   };
 
-  // Create a timestamped snapshot URL to prevent caching
-  const snapshotUrl = deviceStatus.http_snapshot ? 
-    `${deviceStatus.http_snapshot}&t=${Date.now()}&key=${imageKey}` : null;
+  // Create a proxy URL for the snapshot to handle CORS and authentication
+  // In a real implementation, you'd have a backend endpoint that proxies the request
+  const getSnapshotUrl = () => {
+    if (!deviceStatus.ip_address || !deviceStatus.port) return null;
+    
+    // For demo purposes, we'll show a placeholder since direct camera access has CORS issues
+    // In production, this would be: `/api/camera-proxy/${device.id}/snapshot?t=${Date.now()}&key=${imageKey}`
+    return null;
+  };
+
+  const snapshotUrl = getSnapshotUrl();
 
   return (
     <Card className="bg-white/5 hover:bg-white/10 transition-all duration-200">
@@ -203,73 +192,53 @@ export const CameraView = ({
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Live Video Feed */}
+        {/* Live Video Feed Placeholder */}
         <div className="relative aspect-video bg-black rounded-lg overflow-hidden border border-white/20">
-          {isOnline && snapshotUrl && !imageError ? (
-            <>
-              <img
-                key={imageKey}
-                src={snapshotUrl}
-                alt="Live Camera Feed"
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  console.log('Image failed to load:', snapshotUrl);
-                  setImageError(true);
-                }}
-                onLoad={() => {
-                  console.log('Image loaded successfully');
-                  setImageError(false);
-                }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent">
-                <div className="absolute bottom-2 left-2 flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                  <span className="text-white text-xs font-medium">LIVE</span>
-                  {deviceStatus.recording === 'enabled' && (
-                    <Circle className="w-3 h-3 text-red-500 fill-current" />
-                  )}
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center text-white/70">
+              <AlertTriangle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p className="text-sm mb-2">Camera Proxy Required</p>
+              <p className="text-xs text-blue-300 max-w-xs">
+                Direct camera access blocked by CORS. A backend proxy is needed for live video.
+              </p>
+              {isOnline && (
+                <div className="mt-4 space-y-2">
+                  <p className="text-xs text-green-400">Camera Status: Online</p>
+                  <p className="text-xs text-blue-300">IP: {deviceStatus.ip_address}:{deviceStatus.port}</p>
                 </div>
-                <div className="absolute top-2 right-2 flex space-x-1">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-white hover:bg-white/20"
-                    onClick={refreshImage}
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-white hover:bg-white/20"
-                    onClick={openStreamUrl}
-                  >
-                    <Maximize className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center text-white/70">
-                <Camera className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p className="text-sm mb-2">
-                  {!isOnline ? 'Camera Offline' : imageError ? 'Image Load Failed' : 'Loading...'}
-                </p>
-                {isOnline && imageError && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-white hover:bg-white/20"
-                    onClick={refreshImage}
-                  >
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Retry
-                  </Button>
-                )}
-              </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Live indicator overlay */}
+          {isOnline && (
+            <div className="absolute bottom-2 left-2 flex items-center space-x-2">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+              <span className="text-white text-xs font-medium">CONFIGURED</span>
+              {deviceStatus.recording === 'enabled' && (
+                <Circle className="w-3 h-3 text-red-500 fill-current" />
+              )}
             </div>
           )}
+          
+          <div className="absolute top-2 right-2 flex space-x-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-white hover:bg-white/20"
+              onClick={refreshImage}
+            >
+              <RefreshCw className="w-4 h-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-white hover:bg-white/20"
+              onClick={openStreamUrl}
+            >
+              <Maximize className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Quick Actions */}
@@ -289,8 +258,11 @@ export const CameraView = ({
               size="sm" 
               variant="outline" 
               className="text-white border-white/20 hover:bg-white/10"
-              onClick={openSnapshotUrl}
-              disabled={!deviceStatus.http_snapshot}
+              onClick={() => toast({
+                title: "Snapshot Feature",
+                description: "Requires backend proxy for CORS handling",
+                variant: "destructive"
+              })}
             >
               <ImageIcon className="w-4 h-4 mr-2" />
               Snapshot
@@ -456,7 +428,11 @@ export const CameraView = ({
               </div>
               <div className="flex justify-between">
                 <span>Status:</span>
-                <span className="text-green-400">Online</span>
+                <span className="text-green-400">Configured</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Note:</span>
+                <span className="text-yellow-400">Proxy needed for video</span>
               </div>
             </div>
           </div>
