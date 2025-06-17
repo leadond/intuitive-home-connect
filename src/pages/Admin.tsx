@@ -47,7 +47,7 @@ const Admin = () => {
     { name: "MyQ", description: "Garage door openers", authType: "OAuth" },
     { name: "NEST", description: "Google Nest devices", authType: "OAuth" },
     { name: "Apple Home", description: "HomeKit integration", authType: "HomeKit" },
-    { name: "Enlighten", description: "Enphase solar monitoring", authType: "OAuth" },
+    { name: "Enlighten", description: "Enphase solar monitoring", authType: "API Key" },
     { name: "ecobee", description: "Smart thermostats", authType: "OAuth" },
     { name: "Hubitat", description: "Local smart hub", authType: "API Key" },
     { name: "TCC Honeywell", description: "Total Connect Comfort", authType: "OAuth" },
