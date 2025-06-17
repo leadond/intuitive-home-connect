@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +31,7 @@ const Admin = () => {
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [yamlConfig, setYamlConfig] = useState("");
+  const [systemId, setSystemId] = useState("");
 
   // Available platforms that users can connect to
   const availablePlatforms = [
@@ -138,7 +138,7 @@ const Admin = () => {
         return;
       }
       
-      // Special handling for ReoLink
+      // Special handling for different platforms
       if (selectedPlatform === "ReoLink") {
         if (!baseUrl) {
           toast({
@@ -149,10 +149,24 @@ const Admin = () => {
           return;
         }
         credentials = {
-          username: apiKey, // Using apiKey field for username
-          password: clientSecret || "", // Using clientSecret field for password
-          camera_ip: baseUrl, // Using baseUrl field for camera IP
-          port: 80 // Default port
+          username: apiKey,
+          password: clientSecret || "",
+          camera_ip: baseUrl,
+          port: 80
+        };
+      } else if (selectedPlatform === "Enlighten") {
+        if (!systemId) {
+          toast({
+            title: "Missing System ID",
+            description: "Please enter your Enphase system ID.",
+            variant: "destructive"
+          });
+          return;
+        }
+        credentials = {
+          api_key: apiKey,
+          system_id: systemId,
+          base_url: baseUrl || "https://api.enphaseenergy.com"
         };
       } else {
         credentials = {
@@ -220,6 +234,7 @@ const Admin = () => {
       setClientId("");
       setClientSecret("");
       setYamlConfig("");
+      setSystemId("");
     } catch (error) {
       console.error('Error connecting platform:', error);
       toast({
@@ -413,6 +428,40 @@ const Admin = () => {
                           />
                         </div>
                       </>
+                    ) : selectedPlatform === "Enlighten" ? (
+                      <>
+                        <div>
+                          <Label htmlFor="api-key" className="text-white">API Key</Label>
+                          <Input 
+                            id="api-key"
+                            type="password"
+                            placeholder="Enter your Enlighten API key"
+                            className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="system-id" className="text-white">System ID</Label>
+                          <Input 
+                            id="system-id"
+                            placeholder="Enter your Enphase system ID"
+                            className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
+                            value={systemId}
+                            onChange={(e) => setSystemId(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="base-url" className="text-white">Base URL (Optional)</Label>
+                          <Input 
+                            id="base-url"
+                            placeholder="https://api.enphaseenergy.com"
+                            className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
+                            value={baseUrl}
+                            onChange={(e) => setBaseUrl(e.target.value)}
+                          />
+                        </div>
+                      </>
                     ) : (
                       <>
                         <div>
@@ -530,6 +579,11 @@ const Admin = () => {
                     {selectedPlatform === "ReoLink" && (
                       <p className="text-sm text-blue-200 mt-2">
                         Note: Enter your camera's local IP address and login credentials. Make sure the camera is accessible on your network.
+                      </p>
+                    )}
+                    {selectedPlatform === "Enlighten" && (
+                      <p className="text-sm text-blue-200 mt-2">
+                        Note: You'll need an Enphase API key and your system ID. Find these in your Enphase Enlighten portal under Developer settings.
                       </p>
                     )}
                   </div>
