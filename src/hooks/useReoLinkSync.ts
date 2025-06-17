@@ -49,7 +49,7 @@ export const useReoLinkSync = () => {
       // Create camera view devices
       const devicesToStore = [];
 
-      // Main camera view device
+      // Main camera view device with corrected URLs
       devicesToStore.push({
         user_id: user.id,
         platform_id: platforms.id,
@@ -66,7 +66,7 @@ export const useReoLinkSync = () => {
           connection_type: 'TCP/IP',
           rtsp_main: `rtsp://${username}:${password}@${cameraIp}:554/h264Preview_01_main`,
           rtsp_sub: `rtsp://${username}:${password}@${cameraIp}:554/h264Preview_01_sub`,
-          http_snapshot: `http://${cameraIp}/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=wuuPhkmUCeI9WG7C&user=${username}&password=${password}`,
+          http_snapshot: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=Snap&channel=0&rs=wuuPhkmUCeI9WG7C&user=${username}&password=${password}`,
           ptz_position: { pan: 0, tilt: 0, zoom: 1 },
           night_vision: 'auto',
           recording: 'enabled'
@@ -82,19 +82,26 @@ export const useReoLinkSync = () => {
           supports_night_vision: true,
           supports_snapshot: true,
           ptz_commands: {
-            pan_left: `http://${cameraIp}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=Left&speed=32&user=${username}&password=${password}`,
-            pan_right: `http://${cameraIp}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=Right&speed=32&user=${username}&password=${password}`,
-            tilt_up: `http://${cameraIp}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=Up&speed=32&user=${username}&password=${password}`,
-            tilt_down: `http://${cameraIp}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=Down&speed=32&user=${username}&password=${password}`,
-            zoom_in: `http://${cameraIp}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=ZoomInc&user=${username}&password=${password}`,
-            zoom_out: `http://${cameraIp}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=ZoomDec&user=${username}&password=${password}`,
-            stop: `http://${cameraIp}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=Stop&user=${username}&password=${password}`,
-            preset_goto: `http://${cameraIp}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=ToPos&id={preset_id}&user=${username}&password=${password}`
+            pan_left: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=Left&speed=32&user=${username}&password=${password}`,
+            pan_right: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=Right&speed=32&user=${username}&password=${password}`,
+            tilt_up: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=Up&speed=32&user=${username}&password=${password}`,
+            tilt_down: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=Down&speed=32&user=${username}&password=${password}`,
+            zoom_in: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=ZoomInc&user=${username}&password=${password}`,
+            zoom_out: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=ZoomDec&user=${username}&password=${password}`,
+            stop: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=Stop&user=${username}&password=${password}`,
+            preset_goto_1: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=ToPos&id=1&user=${username}&password=${password}`,
+            preset_goto_2: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=ToPos&id=2&user=${username}&password=${password}`,
+            preset_goto_3: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=ToPos&id=3&user=${username}&password=${password}`,
+            preset_goto_4: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=ToPos&id=4&user=${username}&password=${password}`,
+            preset_goto_5: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=ToPos&id=5&user=${username}&password=${password}`,
+            preset_goto_6: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=ToPos&id=6&user=${username}&password=${password}`,
+            preset_goto_7: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=ToPos&id=7&user=${username}&password=${password}`,
+            preset_goto_8: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=PtzCtrl&channel=0&op=ToPos&id=8&user=${username}&password=${password}`
           },
           night_vision_commands: {
-            auto: `http://${cameraIp}/cgi-bin/api.cgi?cmd=SetIrLights&channel=0&value=Auto&user=${username}&password=${password}`,
-            on: `http://${cameraIp}/cgi-bin/api.cgi?cmd=SetIrLights&channel=0&value=On&user=${username}&password=${password}`,
-            off: `http://${cameraIp}/cgi-bin/api.cgi?cmd=SetIrLights&channel=0&value=Off&user=${username}&password=${password}`
+            auto: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=SetIrLights&channel=0&value=Auto&user=${username}&password=${password}`,
+            on: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=SetIrLights&channel=0&value=On&user=${username}&password=${password}`,
+            off: `http://${cameraIp}:${port}/cgi-bin/api.cgi?cmd=SetIrLights&channel=0&value=Off&user=${username}&password=${password}`
           }
         }
       });
