@@ -67,7 +67,7 @@ export const useEnlightenSync = () => {
         throw new Error('Failed to get platform credentials');
       }
 
-      const credentials = platform.credentials as EnlightenCredentials;
+      const credentials = platform.credentials as unknown as EnlightenCredentials;
       if (!credentials.api_key || !credentials.system_id) {
         throw new Error('Missing API key or system ID');
       }
