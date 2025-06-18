@@ -21,9 +21,6 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useSmartHomeData } from "@/hooks/useSmartHomeData";
 import { ClearPlatformData } from "@/components/ClearPlatformData";
-import { ReoLinkSync } from "@/components/ReoLinkSync";
-import { SmartThingsSync } from "@/components/SmartThingsSync";
-import { KonnectedSync } from "@/components/KonnectedSync";
 
 const Admin = () => {
   const { toast } = useToast();
@@ -34,7 +31,6 @@ const Admin = () => {
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [yamlConfig, setYamlConfig] = useState("");
-  const [systemId, setSystemId] = useState("");
 
   // Available platforms that users can connect to
   const availablePlatforms = [
@@ -50,7 +46,7 @@ const Admin = () => {
     { name: "MyQ", description: "Garage door openers", authType: "OAuth" },
     { name: "NEST", description: "Google Nest devices", authType: "OAuth" },
     { name: "Apple Home", description: "HomeKit integration", authType: "HomeKit" },
-    { name: "Enlighten", description: "Enphase solar monitoring", authType: "API Key" },
+    { name: "Enlighten", description: "Enphase solar monitoring", authType: "OAuth" },
     { name: "ecobee", description: "Smart thermostats", authType: "OAuth" },
     { name: "Hubitat", description: "Local smart hub", authType: "API Key" },
     { name: "TCC Honeywell", description: "Total Connect Comfort", authType: "OAuth" },
@@ -141,7 +137,7 @@ const Admin = () => {
         return;
       }
       
-      // Special handling for different platforms
+      // Special handling for ReoLink
       if (selectedPlatform === "ReoLink") {
         if (!baseUrl) {
           toast({
@@ -152,24 +148,10 @@ const Admin = () => {
           return;
         }
         credentials = {
-          username: apiKey,
-          password: clientSecret || "",
-          camera_ip: baseUrl,
-          port: 443
-        };
-      } else if (selectedPlatform === "Enlighten") {
-        if (!systemId) {
-          toast({
-            title: "Missing System ID",
-            description: "Please enter your Enphase system ID.",
-            variant: "destructive"
-          });
-          return;
-        }
-        credentials = {
-          api_key: apiKey,
-          system_id: systemId,
-          base_url: baseUrl || "https://api.enphaseenergy.com"
+          username: apiKey, // Using apiKey field for username
+          password: clientSecret || "", // Using clientSecret field for password
+          camera_ip: baseUrl, // Using baseUrl field for camera IP
+          port: 80 // Default port
         };
       } else {
         credentials = {
@@ -237,7 +219,6 @@ const Admin = () => {
       setClientId("");
       setClientSecret("");
       setYamlConfig("");
-      setSystemId("");
     } catch (error) {
       console.error('Error connecting platform:', error);
       toast({
@@ -298,13 +279,6 @@ const Admin = () => {
 
         {/* Clear Data Button */}
         <ClearPlatformData />
-
-        {/* Platform Management Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <ReoLinkSync />
-          <SmartThingsSync />
-          <KonnectedSync />
-        </div>
 
         {/* Platform Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -438,40 +412,6 @@ const Admin = () => {
                           />
                         </div>
                       </>
-                    ) : selectedPlatform === "Enlighten" ? (
-                      <>
-                        <div>
-                          <Label htmlFor="api-key" className="text-white">API Key</Label>
-                          <Input 
-                            id="api-key"
-                            type="password"
-                            placeholder="Enter your Enlighten API key"
-                            className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
-                            value={apiKey}
-                            onChange={(e) => setApiKey(e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="system-id" className="text-white">System ID</Label>
-                          <Input 
-                            id="system-id"
-                            placeholder="Enter your Enphase system ID"
-                            className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
-                            value={systemId}
-                            onChange={(e) => setSystemId(e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="base-url" className="text-white">Base URL (Optional)</Label>
-                          <Input 
-                            id="base-url"
-                            placeholder="https://api.enphaseenergy.com"
-                            className="bg-white/10 border-white/20 text-white placeholder:text-blue-300"
-                            value={baseUrl}
-                            onChange={(e) => setBaseUrl(e.target.value)}
-                          />
-                        </div>
-                      </>
                     ) : (
                       <>
                         <div>
@@ -589,11 +529,6 @@ const Admin = () => {
                     {selectedPlatform === "ReoLink" && (
                       <p className="text-sm text-blue-200 mt-2">
                         Note: Enter your camera's local IP address and login credentials. Make sure the camera is accessible on your network.
-                      </p>
-                    )}
-                    {selectedPlatform === "Enlighten" && (
-                      <p className="text-sm text-blue-200 mt-2">
-                        Note: You'll need an Enphase API key and your system ID. Find these in your Enphase Enlighten portal under Developer settings.
                       </p>
                     )}
                   </div>

@@ -1,55 +1,72 @@
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Activity, Clock } from "lucide-react";
+import { useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Activity, AlertTriangle, Check, Clock, Info, RefreshCw } from "lucide-react";
 import { useSmartHomeData } from "@/hooks/useSmartHomeData";
-import { formatDistanceToNow } from "date-fns";
 
 export const RecentActivity = () => {
   const { activityLogs, isLoading } = useSmartHomeData();
 
-  const getActivityColor = (action: string) => {
-    if (action.includes('automation') || action.includes('scheduled')) {
-      return "bg-blue-600 hover:bg-blue-600";
+  useEffect(() => {
+    console.log('RecentActivity - activityLogs:', activityLogs);
+  }, [activityLogs]);
+
+  // Function to get icon based on activity type
+  const getActivityIcon = (activityType: string) => {
+    switch (activityType) {
+      case 'device_state_change':
+        return <Check className="w-4 h-4 text-green-400" />;
+      case 'device_brightness_change':
+      case 'device_color_change':
+      case 'thermostat_temperature_change':
+      case 'thermostat_mode_change':
+        return <RefreshCw className="w-4 h-4 text-blue-400" />;
+      case 'camera_ptz_command':
+      case 'camera_night_vision_change':
+        return <Info className="w-4 h-4 text-purple-400" />;
+      case 'error':
+        return <AlertTriangle className="w-4 h-4 text-red-400" />;
+      default:
+        return <Activity className="w-4 h-4 text-blue-400" />;
     }
-    if (action.includes('manual') || action.includes('user')) {
-      return "bg-green-600 hover:bg-green-600";
-    }
-    if (action.includes('alert') || action.includes('motion') || action.includes('alarm')) {
-      return "bg-red-600 hover:bg-red-600";
-    }
-    return "bg-gray-600 hover:bg-gray-600";
   };
 
-  const getActivityType = (action: string) => {
-    if (action.includes('automation') || action.includes('scheduled')) {
-      return 'automation';
+  // Function to format timestamp
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) {
+      return 'Just now';
+    } else if (diffMins < 60) {
+      return `${diffMins} min${diffMins === 1 ? '' : 's'} ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+    } else if (diffDays < 7) {
+      return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+    } else {
+      return date.toLocaleDateString();
     }
-    if (action.includes('manual') || action.includes('user')) {
-      return 'manual';
-    }
-    if (action.includes('alert') || action.includes('motion') || action.includes('alarm')) {
-      return 'alert';
-    }
-    return 'system';
   };
 
   if (isLoading) {
     return (
-      <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-white">
+      <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-white h-full">
         <CardHeader>
           <CardTitle className="flex items-center">
-            <Activity className="w-5 h-5 mr-2 text-green-400" />
+            <Activity className="w-5 h-5 mr-2 text-blue-400" />
             Recent Activity
           </CardTitle>
+          <CardDescription className="text-blue-200">
+            Loading activity logs...
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="animate-pulse">
-                <div className="h-16 bg-white/10 rounded-lg"></div>
-              </div>
-            ))}
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
           </div>
         </CardContent>
       </Card>
@@ -57,44 +74,38 @@ export const RecentActivity = () => {
   }
 
   return (
-    <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-white">
+    <Card className="bg-white/10 backdrop-blur-sm border-white/20 text-white h-full">
       <CardHeader>
         <CardTitle className="flex items-center">
-          <Activity className="w-5 h-5 mr-2 text-green-400" />
+          <Activity className="w-5 h-5 mr-2 text-blue-400" />
           Recent Activity
         </CardTitle>
+        <CardDescription className="text-blue-200">
+          Latest actions in your smart home
+          {activityLogs.length > 0 ? ` (${activityLogs.length} logs found)` : ' (No activity logs found)'}
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          {activityLogs.length === 0 ? (
-            <p className="text-blue-300 text-center py-4">No recent activity</p>
-          ) : (
-            activityLogs.map((activity) => (
-              <div 
-                key={activity.id}
-                className="flex items-start space-x-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200"
-              >
-                <div className="p-1 rounded-full bg-white/10 mt-1">
-                  <Clock className="w-3 h-3 text-blue-400" />
+        {activityLogs.length === 0 ? (
+          <div className="text-center py-8">
+            <Clock className="w-12 h-12 text-blue-300 mx-auto mb-4 opacity-50" />
+            <p className="text-blue-300">No recent activity</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {activityLogs.map((log) => (
+              <div key={log.id} className="flex items-start space-x-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200">
+                <div className="p-2 rounded-full bg-white/10">
+                  {getActivityIcon(log.activity_type)}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white">{activity.action}</p>
-                  <div className="flex items-center space-x-2 mt-1">
-                    <Badge variant="secondary" className="text-xs">
-                      {activity.device_name}
-                    </Badge>
-                    <Badge className={`text-xs ${getActivityColor(activity.action)}`}>
-                      {getActivityType(activity.action)}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-blue-300 mt-1">
-                    {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
-                  </p>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{log.description}</p>
+                  <p className="text-xs text-blue-300 mt-1">{formatTimestamp(log.created_at)}</p>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

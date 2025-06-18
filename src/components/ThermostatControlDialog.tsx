@@ -1,18 +1,8 @@
-
-import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Card, CardContent } from "@/components/ui/card";
 import { Thermometer, Snowflake, Flame, Wind, Power } from "lucide-react";
-import { useSmartThingsStatus } from "@/hooks/useSmartThingsStatus";
-import { useToast } from "@/hooks/use-toast";
 import { SmartHomeDevice } from "@/hooks/useSmartHomeData";
 
 interface ThermostatControlDialogProps {
@@ -30,206 +20,144 @@ export const ThermostatControlDialog = ({
   deviceStatus,
   onStatusUpdate
 }: ThermostatControlDialogProps) => {
-  const { sendDeviceCommand, isUpdating } = useSmartThingsStatus();
-  const { toast } = useToast();
+  const [temperature, setTemperature] = useState(deviceStatus?.target_temperature || 72);
+  const [mode, setMode] = useState(deviceStatus?.mode || 'off');
+  const [fanMode, setFanMode] = useState(deviceStatus?.fan_mode || 'auto');
   
-  const [localHeatingSetpoint, setLocalHeatingSetpoint] = useState(deviceStatus.heatingSetpoint || 70);
-  const [localCoolingSetpoint, setLocalCoolingSetpoint] = useState(deviceStatus.coolingSetpoint || 75);
-  const [localMode, setLocalMode] = useState(deviceStatus.thermostatMode || 'off');
-
+  // Update local state when device status changes
   useEffect(() => {
-    setLocalHeatingSetpoint(deviceStatus.heatingSetpoint || 70);
-    setLocalCoolingSetpoint(deviceStatus.coolingSetpoint || 75);
-    setLocalMode(deviceStatus.thermostatMode || 'off');
+    if (deviceStatus) {
+      setTemperature(deviceStatus.target_temperature || 72);
+      setMode(deviceStatus.mode || 'off');
+      setFanMode(deviceStatus.fan_mode || 'auto');
+    }
   }, [deviceStatus]);
 
-  const handleModeChange = async (mode: string) => {
-    if (!mode) return;
-    
-    try {
-      setLocalMode(mode);
-      await sendDeviceCommand(device.device_id, 'thermostatMode', 'setThermostatMode', [mode]);
-      
-      toast({
-        title: "Mode Updated",
-        description: `Thermostat set to ${mode} mode`,
-      });
-      
-      setTimeout(onStatusUpdate, 1000);
-    } catch (error) {
-      console.error('Error changing thermostat mode:', error);
-      setLocalMode(deviceStatus.thermostatMode || 'off');
-    }
+  const handleSave = () => {
+    // In a real implementation, this would call an API to update the thermostat
+    console.log('Saving thermostat settings:', { temperature, mode, fanMode });
+    onStatusUpdate();
+    onClose();
   };
 
-  const handleHeatingSetpointChange = async (value: number[]) => {
-    const temperature = value[0];
-    setLocalHeatingSetpoint(temperature);
-    
-    try {
-      await sendDeviceCommand(device.device_id, 'thermostatHeatingSetpoint', 'setHeatingSetpoint', [temperature]);
-      
-      toast({
-        title: "Heating Setpoint Updated",
-        description: `Heating set to ${temperature}°F`,
-      });
-      
-      setTimeout(onStatusUpdate, 1000);
-    } catch (error) {
-      console.error('Error changing heating setpoint:', error);
-      setLocalHeatingSetpoint(deviceStatus.heatingSetpoint || 70);
-    }
-  };
+  const currentTemp = deviceStatus?.current_temperature || temperature;
+  const humidity = deviceStatus?.humidity || 45;
 
-  const handleCoolingSetpointChange = async (value: number[]) => {
-    const temperature = value[0];
-    setLocalCoolingSetpoint(temperature);
-    
-    try {
-      await sendDeviceCommand(device.device_id, 'thermostatCoolingSetpoint', 'setCoolingSetpoint', [temperature]);
-      
-      toast({
-        title: "Cooling Setpoint Updated",
-        description: `Cooling set to ${temperature}°F`,
-      });
-      
-      setTimeout(onStatusUpdate, 1000);
-    } catch (error) {
-      console.error('Error changing cooling setpoint:', error);
-      setLocalCoolingSetpoint(deviceStatus.coolingSetpoint || 75);
-    }
-  };
-
-  const currentTemp = deviceStatus.temperature || 72;
-  
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md bg-gradient-to-br from-slate-800 to-slate-900 text-white border-slate-600">
+      <DialogContent className="bg-slate-800 text-white border-slate-700">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl">
-            <Thermometer className="w-6 h-6 text-blue-400" />
+          <DialogTitle className="text-xl flex items-center gap-2">
+            <Thermometer className="w-5 h-5" />
             {device.device_name}
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-6 py-4">
+        <div className="py-4">
           {/* Current Temperature Display */}
-          <Card className="bg-slate-700/50 border-slate-600">
-            <CardContent className="p-6 text-center">
-              <div className="text-4xl font-bold text-white mb-2">
-                {Math.round(currentTemp)}°F
-              </div>
-              <div className="text-sm text-slate-300">Current Temperature</div>
-            </CardContent>
-          </Card>
-
-          {/* Mode Selection */}
-          <div className="space-y-3">
-            <h3 className="text-lg font-semibold text-white">Mode</h3>
-            <ToggleGroup
-              type="single"
-              value={localMode}
-              onValueChange={handleModeChange}
-              className="grid grid-cols-2 gap-2 w-full"
-              disabled={isUpdating}
-            >
-              <ToggleGroupItem
-                value="off"
-                className="flex flex-col items-center p-4 h-auto bg-slate-700 hover:bg-slate-600 data-[state=on]:bg-slate-500 text-white border-slate-600"
-              >
-                <Power className="w-6 h-6 mb-2" />
-                <span className="text-sm">Off</span>
-              </ToggleGroupItem>
-              <ToggleGroupItem
-                value="heat"
-                className="flex flex-col items-center p-4 h-auto bg-slate-700 hover:bg-slate-600 data-[state=on]:bg-orange-600 text-white border-slate-600"
-              >
-                <Flame className="w-6 h-6 mb-2" />
-                <span className="text-sm">Heat</span>
-              </ToggleGroupItem>
-              <ToggleGroupItem
-                value="cool"
-                className="flex flex-col items-center p-4 h-auto bg-slate-700 hover:bg-slate-600 data-[state=on]:bg-blue-600 text-white border-slate-600"
-              >
-                <Snowflake className="w-6 h-6 mb-2" />
-                <span className="text-sm">Cool</span>
-              </ToggleGroupItem>
-              <ToggleGroupItem
-                value="auto"
-                className="flex flex-col items-center p-4 h-auto bg-slate-700 hover:bg-slate-600 data-[state=on]:bg-green-600 text-white border-slate-600"
-              >
-                <Wind className="w-6 h-6 mb-2" />
-                <span className="text-sm">Auto</span>
-              </ToggleGroupItem>
-            </ToggleGroup>
+          <div className="text-center mb-6">
+            <div className="text-5xl font-light">{currentTemp}°</div>
+            <div className="text-sm text-blue-300 mt-1">Current Temperature</div>
+            <div className="text-xs text-blue-300 mt-1">Humidity: {humidity}%</div>
           </div>
-
-          {/* Temperature Controls */}
-          {(localMode === 'heat' || localMode === 'auto') && (
-            <div className="space-y-4">
+          
+          {/* Temperature Control */}
+          <div className="space-y-6">
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <Flame className="w-5 h-5 text-orange-400" />
-                  Heat to
-                </h3>
-                <span className="text-2xl font-bold text-orange-400">
-                  {localHeatingSetpoint}°F
-                </span>
+                <p className="text-sm">Target Temperature</p>
+                <p className="text-sm font-medium">{temperature}°</p>
               </div>
               <Slider
-                value={[localHeatingSetpoint]}
-                onValueChange={handleHeatingSetpointChange}
-                min={50}
+                value={[temperature]}
+                onValueChange={(value) => setTemperature(value[0])}
+                min={60}
                 max={85}
                 step={1}
-                disabled={isUpdating}
-                className="w-full"
               />
-              <div className="flex justify-between text-xs text-slate-400">
-                <span>50°F</span>
-                <span>85°F</span>
+              <div className="flex justify-between text-xs text-blue-300">
+                <span>60°</span>
+                <span>85°</span>
               </div>
             </div>
-          )}
-
-          {(localMode === 'cool' || localMode === 'auto') && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <Snowflake className="w-5 h-5 text-blue-400" />
-                  Cool to
-                </h3>
-                <span className="text-2xl font-bold text-blue-400">
-                  {localCoolingSetpoint}°F
-                </span>
-              </div>
-              <Slider
-                value={[localCoolingSetpoint]}
-                onValueChange={handleCoolingSetpointChange}
-                min={50}
-                max={85}
-                step={1}
-                disabled={isUpdating}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-slate-400">
-                <span>50°F</span>
-                <span>85°F</span>
+            
+            {/* Mode Selection */}
+            <div className="space-y-2">
+              <p className="text-sm">Mode</p>
+              <div className="grid grid-cols-4 gap-2">
+                <Button
+                  variant={mode === 'off' ? 'default' : 'outline'}
+                  className={mode === 'off' ? 'bg-slate-600' : 'border-white/20'}
+                  onClick={() => setMode('off')}
+                >
+                  <Power className="w-4 h-4 mr-2" />
+                  Off
+                </Button>
+                <Button
+                  variant={mode === 'heat' ? 'default' : 'outline'}
+                  className={mode === 'heat' ? 'bg-orange-600' : 'border-white/20'}
+                  onClick={() => setMode('heat')}
+                >
+                  <Flame className="w-4 h-4 mr-2" />
+                  Heat
+                </Button>
+                <Button
+                  variant={mode === 'cool' ? 'default' : 'outline'}
+                  className={mode === 'cool' ? 'bg-blue-600' : 'border-white/20'}
+                  onClick={() => setMode('cool')}
+                >
+                  <Snowflake className="w-4 h-4 mr-2" />
+                  Cool
+                </Button>
+                <Button
+                  variant={mode === 'auto' ? 'default' : 'outline'}
+                  className={mode === 'auto' ? 'bg-green-600' : 'border-white/20'}
+                  onClick={() => setMode('auto')}
+                >
+                  <Wind className="w-4 h-4 mr-2" />
+                  Auto
+                </Button>
               </div>
             </div>
-          )}
-
-          {/* Close Button */}
-          <div className="flex justify-end pt-4">
-            <Button
-              onClick={onClose}
-              variant="outline"
-              className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
-            >
-              Close
-            </Button>
+            
+            {/* Fan Mode */}
+            <div className="space-y-2">
+              <p className="text-sm">Fan</p>
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  variant={fanMode === 'auto' ? 'default' : 'outline'}
+                  className={fanMode === 'auto' ? 'bg-blue-600' : 'border-white/20'}
+                  onClick={() => setFanMode('auto')}
+                >
+                  Auto
+                </Button>
+                <Button
+                  variant={fanMode === 'on' ? 'default' : 'outline'}
+                  className={fanMode === 'on' ? 'bg-blue-600' : 'border-white/20'}
+                  onClick={() => setFanMode('on')}
+                >
+                  On
+                </Button>
+                <Button
+                  variant={fanMode === 'circulate' ? 'default' : 'outline'}
+                  className={fanMode === 'circulate' ? 'bg-blue-600' : 'border-white/20'}
+                  onClick={() => setFanMode('circulate')}
+                >
+                  Circulate
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
+        
+        <DialogFooter>
+          <Button variant="outline" className="border-white/20" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave}>
+            Save Changes
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
