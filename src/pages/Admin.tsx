@@ -21,6 +21,9 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useSmartHomeData } from "@/hooks/useSmartHomeData";
 import { ClearPlatformData } from "@/components/ClearPlatformData";
+import { ReoLinkSync } from "@/components/ReoLinkSync";
+import { SmartThingsSync } from "@/components/SmartThingsSync";
+import { KonnectedSync } from "@/components/KonnectedSync";
 
 const Admin = () => {
   const { toast } = useToast();
@@ -152,7 +155,7 @@ const Admin = () => {
           username: apiKey,
           password: clientSecret || "",
           camera_ip: baseUrl,
-          port: 80
+          port: 443
         };
       } else if (selectedPlatform === "Enlighten") {
         if (!systemId) {
@@ -295,6 +298,13 @@ const Admin = () => {
 
         {/* Clear Data Button */}
         <ClearPlatformData />
+
+        {/* Platform Management Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <ReoLinkSync />
+          <SmartThingsSync />
+          <KonnectedSync />
+        </div>
 
         {/* Platform Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
